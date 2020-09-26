@@ -1,5 +1,5 @@
-const W = 1200  // width of bgCanvas
-const H = 500  // height of bgCanvas
+const W = 1200 // width of bgCanvas
+const H = 500 // height of bgCanvas
 const Wsim = W * 0.69
 const Hsim = H
 const Wplot = 0.25 * W
@@ -13,9 +13,9 @@ let scene;
 
 function setup() {
   bgCanvas = createCanvas(W, H)
-  bgCanvas.parent("simwrapper")
+  bgCanvas.parent("simwrapper");
 
-  simCanvas = createGraphics(Wsim, Hsim)
+  simCanvas = createGraphics(Wsim - 20, Hsim - 20)
 
   plotCanvas = createGraphics(Wplot, Hplot)
   plotCanvas.background(20)
@@ -38,21 +38,17 @@ function setup() {
   );
 }
 
- function draw(){
-  // border of simCanvas
+function draw() {
+  background(20);
+  stroke(255)
+  strokeWeight(2)
+  noFill()
+  rect(10, 10, Wsim - 20, Hsim - 20)
+
   simCanvas.clear()
-  simCanvas.stroke(255)
-  simCanvas.strokeWeight(2)
-  simCanvas.noFill()
-  simCanvas.rect(10, 10, Wsim - 20, Hsim - 20)
-
-  background(0);
-
-  // sim canvas
-  image(simCanvas, 0, 0);
-
-  scene.draw();
+  scene.draw(simCanvas);
   scene.updateSampleRayDirection(0, mouseX, mouseY);
+  image(simCanvas, 10, 10);
 }
 
 class Scene {
@@ -69,9 +65,9 @@ class Scene {
     this.rays[index].cast(this.mirrors);
   }
 
-  draw() {
-    this.mirrors.forEach(m => m.draw());
-    this.rays.forEach(r => r.draw());
+  draw(canv) {
+    this.mirrors.forEach(m => m.draw(canv));
+    this.rays.forEach(r => r.draw(canv));
   }
 }
 
@@ -80,7 +76,7 @@ class Mirror {
   constructor(start, end) {
     this.start = start;
     this.end = end;
-    this.direction = _V.sub(end, start).normalize();  // direction parallel to mirror;
+    this.direction = _V.sub(end, start).normalize(); // direction parallel to mirror;
     this.normal = this.direction.copy().rotate(-HALF_PI);
     this.length = _V.dist(start, end);
     this.shadeDirection = this.direction.copy().rotate(3 * PI / 4);
@@ -92,30 +88,33 @@ class Mirror {
     const v2 = _V.sub(this.end, this.start);
     const v3 = createVector(-ray.direction.y, ray.direction.x);
     const denom = _V.dot(v2, v3);
-    if (denom == 0) return false;  // ray is parallel
+    if (denom == 0) return false; // ray is parallel
     const t1 = _V.cross(v2, v1).z / denom;
-    if (abs(t1) < 1e-5) return false;  // if origin is very close to line
+    if (abs(t1) < 1e-5) return false; // if origin is very close to line
     const t2 = _V.dot(v1, v3) / _V.dot(v2, v3);
-    if (t2 < 0 || t2 > 1) return false;  // intersects outside the mirror
-    return { t: t1, n: this.normal.copy() };
+    if (t2 < 0 || t2 > 1) return false; // intersects outside the mirror
+    return {
+      t: t1,
+      n: this.normal.copy()
+    };
   }
 
-  draw() {
-    push();
-    stroke(255);
-    strokeWeight(3);
-    line(this.start.x, this.start.y, this.end.x, this.end.y);
+  draw(canv) {
+    canv.push();
+    canv.stroke(255);
+    canv.strokeWeight(3);
+    canv.line(this.start.x, this.start.y, this.end.x, this.end.y);
 
     // mirror shade
-    strokeWeight(1);
+    canv.strokeWeight(1);
     const step = 7;
     const shadeLength = 10;
     for (let d = step; d < this.length; d += step) {
       const p = _V.add(this.start, _V.mult(this.direction, d));
       const pe = _V.add(p, _V.mult(this.shadeDirection, shadeLength));
-      line(p.x, p.y, pe.x, pe.y);
+      canv.line(p.x, p.y, pe.x, pe.y);
     }
-    pop();
+    canv.pop();
   }
 }
 
@@ -180,24 +179,24 @@ class Ray {
     }
   }
 
-  draw() {
-    push();
-    stroke(this.rayColor);
-    strokeWeight(1);
-    ellipse(this.origin.x, this.origin.y, 5, 5);
-    line(this.origin.x, this.origin.y, this.end.x, this.end.y);
+  draw(canv) {
+    canv.push();
+    canv.stroke(this.rayColor);
+    canv.strokeWeight(1);
+    canv.ellipse(this.origin.x, this.origin.y, 5, 5);
+    canv.line(this.origin.x, this.origin.y, this.end.x, this.end.y);
     // draw arrow
-    push()
+    canv.push()
     const arrowSize = 4;
-    translate(this.arrowPos.x, this.arrowPos.y);
-    rotate(this.direction.heading() + PI / 2);
-    fill(this.rayColor);
-    noStroke();
-    triangle(0, 0, -arrowSize, arrowSize * 2, arrowSize, arrowSize * 2)
-    pop();
-    pop();
+    canv.translate(this.arrowPos.x, this.arrowPos.y);
+    canv.rotate(this.direction.heading() + PI / 2);
+    canv.fill(this.rayColor);
+    canv.noStroke();
+    canv.triangle(0, 0, -arrowSize, arrowSize * 2, arrowSize, arrowSize * 2)
+    canv.pop();
+    canv.pop();
     if (this.next) {
-      this.next.draw();
+      this.next.draw(canv);
     }
   }
 }
