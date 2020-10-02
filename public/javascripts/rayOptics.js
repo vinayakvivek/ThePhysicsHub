@@ -26,9 +26,9 @@ function setup() {
   plotCanvas.rect(0, 0, Wplot, Hplot)
 
   let m1Convex = new SphericalMirror(
-    createVector(350, 180),
-    createVector(550, 200),
-    createVector(350, 220),
+    createVector(350, 200),
+    createVector(550, 250),
+    createVector(350, 300),
     false, // is convex
   )
 
@@ -133,6 +133,42 @@ function isPointOnRight(v1, v2, p) {
   return _V.sub(v1, v2).cross(_V.sub(p, v2)).z > 0;
 }
 
+/**
+ * Finds the circle equation from 3 points
+ * returns the center and radius
+ * [source]: https://www.geeksforgeeks.org/equation-of-circle-when-three-points-on-the-circle-are-given/
+ */
+function findCircle(x1, y1, x2, y2, x3, y3) {
+  const x12 = x1 - x2;
+  const x13 = x1 - x3;
+
+  const y12 = y1 - y2;
+  const y13 = y1 - y3;
+
+  const y31 = y3 - y1;
+  const y21 = y2 - y1;
+
+  const x31 = x3 - x1;
+  const x21 = x2 - x1;
+
+  const sx13 = x1 * x1 - x3 * x3;
+  const sy13 = y1 * y1 - y3 * y3;
+
+  const sx21 = x2 * x2- x1 * x1;
+  const sy21 = y2 * y2 - y1 * y1;
+
+  const f = (sx13 * x12 + sy13 * x12 + sx21 * x13 + sy21 * x13) / (2 * (y31 * x12 - y21 * x13));
+
+  const g = (sx13 * y12 + sy13 * y12 + sx21 * y13 + sy21 * y13) / (2 * (x31 * y12 - x21 * y13));
+
+  const c = (- x1 * x1 - y1 * y1 - 2 * g * x1 - 2 * f * y1);
+
+  return {
+    center: createVector(-g, -f),
+    radius: sqrt(g * g + f * f - c),
+  }
+}
+
 class SphericalMirror {
 
   // p1, p2, p3 are position vectors of points on the circumference
@@ -149,7 +185,15 @@ class SphericalMirror {
       this.p1 = p3;
       this.p3 = p1;
     }
-    this.findCircle(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+    const { center, radius } = findCircle(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+    if (!radius) {
+      // radius is NaN => circle is invalid (3 points are in one line)
+      this.isValid = false;
+    } else {
+      this.c = center;
+      this.r = radius;
+      this.isValid = true;
+    }
 
     // arc angles
     const v1 = _V.sub(this.p1, this.c);
@@ -161,40 +205,6 @@ class SphericalMirror {
     this.arcAngle = a < 0 ? a + 2 * PI : a;
   }
 
-  /**
-   * Finds the circle equation from 3 points
-   * sets center (this.c) and radius (this.r)
-   * [source]: https://www.geeksforgeeks.org/equation-of-circle-when-three-points-on-the-circle-are-given/
-   */
-  findCircle(x1, y1, x2, y2, x3, y3) {
-    const x12 = x1 - x2;
-    const x13 = x1 - x3;
-
-    const y12 = y1 - y2;
-    const y13 = y1 - y3;
-
-    const y31 = y3 - y1;
-    const y21 = y2 - y1;
-
-    const x31 = x3 - x1;
-    const x21 = x2 - x1;
-
-    const sx13 = x1 * x1 - x3 * x3;
-    const sy13 = y1 * y1 - y3 * y3;
-
-    const sx21 = x2 * x2- x1 * x1;
-    const sy21 = y2 * y2 - y1 * y1;
-
-    const f = (sx13 * x12 + sy13 * x12 + sx21 * x13 + sy21 * x13) / (2 * (y31 * x12 - y21 * x13));
-
-    const g = (sx13 * y12 + sy13 * y12 + sx21 * y13 + sy21 * y13) / (2 * (x31 * y12 - x21 * y13));
-
-    const c = (- x1 * x1 - y1 * y1 - 2 * g * x1 - 2 * f * y1);
-
-    this.c = createVector(-g, -f);
-    this.r = sqrt(g * g + f * f - c);
-  }
-
   isPointOnArcSide(p) {
     return isPointOnRight(this.p1, this.p3, p);
   }
@@ -204,6 +214,7 @@ class SphericalMirror {
    * @param {Ray} ray
    */
   intersectRay(ray) {
+    if (!this.isValid) return false;
     const A = _V.sub(ray.origin, this.c);
     const modA = A.mag();
     const dA = _V.dot(ray.direction, A);
@@ -239,6 +250,7 @@ class SphericalMirror {
   }
 
   draw(canvas) {
+    if (!this.isValid) return;
     canvas.push();
     canvas.stroke(255);
     canvas.strokeWeight(3);
