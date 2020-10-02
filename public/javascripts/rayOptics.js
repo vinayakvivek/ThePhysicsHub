@@ -1,7 +1,7 @@
 const W = 1200 // width of bgCanvas
-const H = 500 // height of bgCanvas
+const H = 600 // height of bgCanvas
 const Wsim = W * 0.69 - 20;
-const Hsim = H - 20;
+const Hsim = H - 15;
 const Wplot = 0.25 * W
 const Hplot = 0.875 * H
 let bgCanvas, simCanvas, plotCanvas;
@@ -25,22 +25,31 @@ function setup() {
   plotCanvas.noFill()
   plotCanvas.rect(0, 0, Wplot, Hplot)
 
-  let m1Convex = new SphericalMirror(
+  const m1Concave = new SphericalMirror(
     createVector(350, 200),
     createVector(550, 250),
     createVector(350, 300),
     false, // is convex
   )
-
+  const m2Convex = new SphericalMirror(
+    createVector(100, 120),
+    createVector(150, 250),
+    createVector(100, 330),
+    true, // is convex
+  )
+  const beam = new Beam(createVector(250, 450), createVector(-1, -2), 10, 40);
   scene = new Scene(
     [
-      new Ray(createVector(300, 300), createVector(-13, 50)),
-      new Ray(createVector(550, 300), createVector(-100, -20)),
+      // new Ray(createVector(300, 300), createVector(-13, 50)),
+      // new Ray(createVector(550, 300), createVector(-100, -20)),
+      // beam1,
+      beam,
     ],
     [
-      m1Convex,
-      // new Mirror(createVector(50, 400), createVector(550, 400)),
-      // new Mirror(createVector(550, 100), createVector(50, 100)),
+      m1Concave,
+      m2Convex,
+      new Mirror(createVector(50, 500), createVector(550, 500)),
+      new Mirror(createVector(550, 100), createVector(50, 100)),
       // new Mirror(createVector(100, 200), createVector(100, 400)),
       // new Mirror(createVector(350, 200), createVector(500, 400)),
     ]
@@ -283,12 +292,11 @@ class SphericalMirror {
 
 }
 
-
 class Ray {
 
   constructor(origin, direction, level = 0) {
-    this.origin = origin;
-    this.direction = direction.normalize();
+    this.origin = origin.copy();
+    this.direction = direction.copy().normalize();
     this.level = level;
     this.rayColor = color(247, 213, 74, 255 * max(0.1, 1 - 2 * level / MAX_RAY_LEVEL));
     this.resetEnd();
@@ -354,11 +362,13 @@ class Ray {
     }
   }
 
-  draw(canvas) {
+  draw(canvas, showSource = true) {
     canvas.push();
     canvas.stroke(this.rayColor);
     canvas.strokeWeight(1);
-    canvas.ellipse(this.origin.x, this.origin.y, 5, 5);
+    if (showSource) {
+      canvas.ellipse(this.origin.x, this.origin.y, 3, 3);
+    }
     canvas.line(this.origin.x, this.origin.y, this.end.x, this.end.y);
     // draw arrow
     canvas.push()
@@ -373,5 +383,56 @@ class Ray {
     if (this.next) {
       this.next.draw(canvas);
     }
+  }
+}
+
+class Beam {
+
+  constructor(origin, direction, numRays = 5, width = 25) {
+    this.origin = origin.copy();
+    this.direction = direction.copy().normalize();
+    this.numRays = numRays;
+    this.width = width;
+    this.rays = [];
+    this.initRays();
+  }
+
+  updateDirection(x, y) {
+    const dir = createVector(x, y).sub(this.origin);
+    this.direction = dir.normalize();
+    this.initRays();
+  }
+
+  initRays() {
+    this.rays = [];
+    this.normal = this.direction.copy().rotate(PI / 2);
+    this.start = this.end = this.origin;
+    if (this.width < 1 || this.numRays <= 0) return;
+    if (this.numRays === 1) {
+      // if only one ray, width does not matter
+      this.rays.push(new Ray(this.origin, this.direction));
+      return;
+    }
+    this.start = _V.mult(this.normal, - this.width / 2).add(this.origin);
+    const posV = this.start.copy();
+    const stepV = _V.mult(this.normal, this.width / (this.numRays - 1));
+    for (let i = 0; i < this.numRays; ++i) {
+      this.rays.push(new Ray(posV, this.direction));
+      posV.add(stepV);
+    }
+    this.end = posV.copy().sub(stepV);
+  }
+
+  cast(mirrors) {
+    this.rays.forEach(r => r.cast(mirrors));
+  }
+
+  draw(canvas) {
+    canvas.push();
+    canvas.stroke(0, 255, 0);
+    canvas.strokeWeight(3);
+    canvas.line(this.start.x, this.start.y, this.end.x, this.end.y);
+    this.rays.forEach(r => r.draw(canvas, false));
+    canvas.pop();
   }
 }
