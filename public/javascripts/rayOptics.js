@@ -1,7 +1,7 @@
 const W = 1200 // width of bgCanvas
 const H = 500 // height of bgCanvas
-const Wsim = W * 0.69
-const Hsim = H
+const Wsim = W * 0.69 - 20;
+const Hsim = H - 20;
 const Wplot = 0.25 * W
 const Hplot = 0.875 * H
 let bgCanvas, simCanvas, plotCanvas;
@@ -15,7 +15,7 @@ function setup() {
   bgCanvas = createCanvas(W, H)
   bgCanvas.parent("simwrapper");
 
-  simCanvas = createGraphics(Wsim - 20, Hsim - 20)
+  simCanvas = createGraphics(Wsim, Hsim)
 
   plotCanvas = createGraphics(Wplot, Hplot)
   plotCanvas.background(20)
@@ -43,7 +43,7 @@ function draw() {
   stroke(255)
   strokeWeight(2)
   noFill()
-  rect(10, 10, Wsim - 20, Hsim - 20)
+  rect(10, 10, Wsim, Hsim)
 
   simCanvas.clear()
   scene.draw(simCanvas);
@@ -65,9 +65,9 @@ class Scene {
     this.rays[index].cast(this.mirrors);
   }
 
-  draw(canv) {
-    this.mirrors.forEach(m => m.draw(canv));
-    this.rays.forEach(r => r.draw(canv));
+  draw(canvas) {
+    this.mirrors.forEach(m => m.draw(canvas));
+    this.rays.forEach(r => r.draw(canvas));
   }
 }
 
@@ -99,22 +99,22 @@ class Mirror {
     };
   }
 
-  draw(canv) {
-    canv.push();
-    canv.stroke(255);
-    canv.strokeWeight(3);
-    canv.line(this.start.x, this.start.y, this.end.x, this.end.y);
+  draw(canvas) {
+    canvas.push();
+    canvas.stroke(255);
+    canvas.strokeWeight(3);
+    canvas.translate(this.start.x, this.start.y);
+    canvas.rotate(this.direction.heading());
+    canvas.line(0, 0, this.length, 0);
 
     // mirror shade
-    canv.strokeWeight(1);
+    canvas.strokeWeight(1);
     const step = 7;
-    const shadeLength = 10;
+    const shadeLength = 8;
     for (let d = step; d < this.length; d += step) {
-      const p = _V.add(this.start, _V.mult(this.direction, d));
-      const pe = _V.add(p, _V.mult(this.shadeDirection, shadeLength));
-      canv.line(p.x, p.y, pe.x, pe.y);
+      canvas.line(d, 0, d - step, shadeLength);
     }
-    canv.pop();
+    canvas.pop();
   }
 }
 
@@ -179,24 +179,24 @@ class Ray {
     }
   }
 
-  draw(canv) {
-    canv.push();
-    canv.stroke(this.rayColor);
-    canv.strokeWeight(1);
-    canv.ellipse(this.origin.x, this.origin.y, 5, 5);
-    canv.line(this.origin.x, this.origin.y, this.end.x, this.end.y);
+  draw(canvas) {
+    canvas.push();
+    canvas.stroke(this.rayColor);
+    canvas.strokeWeight(1);
+    canvas.ellipse(this.origin.x, this.origin.y, 5, 5);
+    canvas.line(this.origin.x, this.origin.y, this.end.x, this.end.y);
     // draw arrow
-    canv.push()
+    canvas.push()
     const arrowSize = 4;
-    canv.translate(this.arrowPos.x, this.arrowPos.y);
-    canv.rotate(this.direction.heading() + PI / 2);
-    canv.fill(this.rayColor);
-    canv.noStroke();
-    canv.triangle(0, 0, -arrowSize, arrowSize * 2, arrowSize, arrowSize * 2)
-    canv.pop();
-    canv.pop();
+    canvas.translate(this.arrowPos.x, this.arrowPos.y);
+    canvas.rotate(this.direction.heading() + PI / 2);
+    canvas.fill(this.rayColor);
+    canvas.noStroke();
+    canvas.triangle(0, 0, -arrowSize, arrowSize * 2, arrowSize, arrowSize * 2)
+    canvas.pop();
+    canvas.pop();
     if (this.next) {
-      this.next.draw(canv);
+      this.next.draw(canvas);
     }
   }
 }
