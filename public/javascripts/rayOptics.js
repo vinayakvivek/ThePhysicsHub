@@ -8,7 +8,7 @@ let bgCanvas, simCanvas, plotCanvas;
 
 const _V = p5.Vector;
 const MAX_LENGTH = 2000;
-const MAX_RAY_LEVEL = 50;
+const MAX_RAY_LEVEL = 5;
 const EPSILON = 1e-5;
 let scene;
 
@@ -298,7 +298,7 @@ class Ray {
     this.origin = origin.copy();
     this.direction = direction.copy().normalize();
     this.level = level;
-    this.rayColor = color(247, 213, 74, 255 * max(0.1, 1 - 2 * level / MAX_RAY_LEVEL));
+    this.rayColor = color(247, 213, 74, 255 * max(0.1, 1 - level / MAX_RAY_LEVEL));
     this.resetEnd();
   }
 
