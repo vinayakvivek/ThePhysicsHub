@@ -11,10 +11,12 @@ const MAX_LENGTH = 2000;
 const MAX_RAY_LEVEL = 5;
 const EPSILON = 1e-5;
 let scene;
+let beam;
 
 function setup() {
-  bgCanvas = createCanvas(W, H)
-  bgCanvas.parent("simwrapper");
+  bgCanvas = createCanvas(W, H);
+  bgCanvas.isMouseOver = true;
+  //bgCanvas.parent("simwrapper");
 
   simCanvas = createGraphics(Wsim, Hsim)
 
@@ -37,7 +39,7 @@ function setup() {
     createVector(100, 330),
     true, // is convex
   )
-  const beam = new Beam(createVector(250, 450), createVector(-1, -2), 10, 40);
+  beam = new Beam(createVector(250, 450), createVector(-1, -2), 10, 40);
   scene = new Scene(
     [
       // new Ray(createVector(300, 300), createVector(-13, 50)),
@@ -52,7 +54,8 @@ function setup() {
       new Mirror(createVector(550, 100), createVector(50, 100)),
       // new Mirror(createVector(100, 200), createVector(100, 400)),
       // new Mirror(createVector(350, 200), createVector(500, 400)),
-    ]
+    ],
+    beam
   );
 }
 
@@ -71,10 +74,12 @@ function draw() {
 
 class Scene {
 
-  constructor(rays, mirrors) {
+  constructor(rays, mirrors, beam) {
     this.rays = rays;
     this.mirrors = mirrors;
     rays.forEach(r => r.cast(mirrors));
+    this.beam = beam;
+    beam.scene = this;
   }
 
   // just for testing
@@ -388,13 +393,15 @@ class Ray {
 
 class Beam {
 
-  constructor(origin, direction, numRays = 5, width = 25) {
+  constructor(origin, direction, numRays = 5, width = 25, rotateButton) {
     this.origin = origin.copy();
     this.direction = direction.copy().normalize();
     this.numRays = numRays;
     this.width = width;
     this.rays = [];
     this.initRays();
+    this.rotateButton = undefined;
+    this.translateButton = undefined;
   }
 
   updateDirection(x, y) {
@@ -435,4 +442,548 @@ class Beam {
     this.rays.forEach(r => r.draw(canvas, false));
     canvas.pop();
   }
+
+  setOrigin(x, y){
+    this.origin.x = x;
+    this.origin.y = y;
+    this.initRays();
+    this.cast(this.scene.mirrors);
+  }
 }
+
+const buttons = [];
+class rotateBeamButton{
+  constructor(canvas, beam) {
+    this.x = -15;
+    this.y = 0;
+    this.r1 = 9;
+    this.r2 = 12;
+    this.fill = "lightgreen";
+    this.color = "white";
+    this.highlightFill = "olive";
+    this.normalFill = "lightgreen";
+    this.activeFill = "darkgreen";
+    this.lineWidth = 1;
+    this.edgeWidth = .8;
+    this.canvas = canvas;
+    this.ctx = (canvas.elt!=undefined)? canvas.elt.getContext("2d"): canvas.getContext("2d");
+    this.beam = beam;
+    beam.rotateButton = this;
+    buttons.push(this);
+  }
+  draw() {
+    const canvas = this.canvas;
+    canvas.translate(this.beam.origin.x, this.beam.origin.y);
+    canvas.rotate(this.beam.direction.heading()+PI/2);
+    this.updateColor();
+    this.drawBackground();
+    this.drawInterior ();
+    if (this.isMouseOver()){
+      this.mouseIsOver = true;
+    } else {
+      this.mouseIsOver = false;
+    }
+    canvas.rotate(-this.beam.direction.heading()-PI/2);
+    canvas.translate(-this.beam.origin.x, -this.beam.origin.y);
+    canvas.elt.getContext("2d").beginPath();
+  }
+  isMouseOver(){
+    let correc = pixelDensity(); //Correction factor
+    const xyMouse = invertCoordinates((mouseX-10) * correc, (mouseY-10) * correc, this.canvas);
+    const xyButton = [this.x, this.y];
+    if ((xyMouse[0] - xyButton[0]) ** 2 + (xyMouse[1] - xyButton[1]) ** 2 <= this.r2 ** 2) {
+      return true;
+    } else {
+      return false;
+    };
+  }
+  updateColor(){
+    if (this.isMouseOver()) {
+      this.fill = this.highlightFill;
+    } else {
+      this.fill = this.normalFill;
+      return;
+    };
+    if (mouseIsPressed){
+      this.fill = this.activeFill;
+    };
+  }
+  drawBackground() {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.fillStyle = this.fill;
+    ctx.lineWidth = this.contourWidth;
+    ctx.arc(this.x, this.y, this.r2, 0, PI * 2);
+    ctx.stroke();
+    ctx.fill();
+  }
+  drawInterior (){
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.lineWidth = this.lineWidth;
+    ctx.strokeStyle = this.color;
+    ctx.beginPath();
+    ctx.moveTo(this.r1 + this.x, this.y);
+    ctx.arc(this.x, this.y, this.r1, 0, 1.5 * PI);
+    ctx.moveTo(this.r1 + this.x - this.r1 / 5, this.y + this.r1 / 5);
+    ctx.lineTo(this.r1 + this.x, this.y);
+    ctx.lineTo(this.r1 + this.x + this.r1 / 5, this.y + this.r1 / 5);
+    ctx.stroke();
+  }
+  handleMousePress(){
+    this.beingDragged = true;
+  }
+  handleMouseDrag(){
+    const dir = createVector(mouseX, mouseY).sub(this.beam.origin).rotate(PI/2);
+    this.beam.direction = dir.normalize();
+    this.beam.initRays();
+    this.beam.cast(this.beam.scene.mirrors);
+  }
+  mouseReleased(){
+    this.beingDragged = false;
+  }
+  updateCursor(){
+    const canvas = document.getElementById("defaultCanvas0");
+    if (canvas.elt.style.cursor != "auto"){return;};
+    if (this.beingDragged){
+      canvas.elt.style.cursor ="grabbing"
+    } else if (this.mouseIsOver){
+      canvas.elt.style.cursor = "grab";
+    } else {
+      canvas.elt.style.cursor = "auto";
+    };
+  }
+}
+
+
+class translateBeamButton{
+  constructor(canvas, beam) {
+    this.x = 15;
+    this.y = 0;
+    this.r1 = 9;
+    this.r2 = 12;
+    this.fill = "deepskyblue";
+    this.color = "white";
+    this.highlightFill = "cornflowerblue";
+    this.normalFill = "deepskyblue";
+    this.activeFill = "darkblue";
+    this.lineWidth = 1.3;
+    this.edgeWidth = .8;
+    this.canvas = canvas;
+    this.ctx = (canvas.elt!=undefined)? canvas.elt.getContext("2d"): canvas.getContext("2d");
+    this.beam = beam;
+    beam.translateButton = this;
+    buttons.push(this);
+  }
+  draw() {
+    const canvas = this.canvas;
+    canvas.translate(this.beam.origin.x, this.beam.origin.y);
+    canvas.rotate(this.beam.direction.heading()+PI/2);
+    this.updateColor();
+    this.drawBackground();
+    this.drawInterior ();
+    if (this.isMouseOver()){
+      this.mouseIsOver = true;
+    } else {
+      this.mouseIsOver = false;
+    }
+    canvas.rotate(-this.beam.direction.heading()-PI/2);
+    canvas.translate(-this.beam.origin.x, -this.beam.origin.y);
+    canvas.elt.getContext("2d").beginPath();
+  }
+  isMouseOver(){
+    let correc = pixelDensity(); //Correction factor
+    const xyMouse = invertCoordinates((mouseX-10) * correc, (mouseY-10) * correc, this.canvas);
+    const xyButton = [this.x, this.y];
+    if ((xyMouse[0] - xyButton[0]) ** 2 + (xyMouse[1] - xyButton[1]) ** 2 <= this.r2 ** 2) {
+      return true;
+    } else {
+      return false;
+    };
+  }
+  updateColor(){
+    if (this.isMouseOver()) {
+      this.fill = this.highlightFill;
+    } else {
+      this.fill = this.normalFill;
+      return;
+    };
+    if (mouseIsPressed){
+      this.fill = this.activeFill;
+    };
+  }
+  drawBackground() {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.fillStyle = this.fill;
+    ctx.lineWidth = this.contourWidth;
+    ctx.arc(this.x, this.y, this.r2, 0, PI * 2);
+    ctx.stroke();
+    ctx.fill();
+  }
+  drawInterior (){
+    const ctx = this.ctx;
+    ctx.lineWidth = this.lineWidth;
+    ctx.strokeStyle = this.color;
+    ctx.beginPath();
+    ctx.translate(this.x, this.y);
+    const dh = this.r1 / 5;
+    for (var i = 1; i <= 4; i++) {
+      ctx.moveTo(0, 0);
+      ctx.lineTo(this.r1, 0);
+      ctx.moveTo(this.r1, 0);
+      ctx.lineTo(this.r1 - dh, -dh);
+      ctx.moveTo(this.r1, 0);
+      ctx.lineTo(this.r1 - dh, +dh);
+      ctx.rotate(PI / 2);
+    };
+    ctx.translate(-this.x, -this.y);
+    ctx.stroke();
+  }
+  handleMousePress(){
+    this.initX = mouseX;
+    this.initY = mouseY;
+    this.initOriginX = this.beam.origin.x;
+    this.initOriginY = this.beam.origin.y;
+    this.beingDragged = true;
+  }
+  handleMouseDrag(){
+    if (!this.beingDragged){return null;};
+    let dx = mouseX - this.initX;
+    let dy = mouseY - this.initY;
+    this.beam.setOrigin(this.initOriginX + dx, this.initOriginY+dy);
+  }
+  mouseReleased(){
+    this.beingDragged = false;
+  }
+  updateCursor(){
+    const canvas = document.getElementById("defaultCanvas0");
+    if (canvas.elt.style.cursor != "auto"){return;};
+    if (this.beingDragged){
+      canvas.elt.style.cursor ="grabbing"
+    } else if (this.mouseIsOver){
+      canvas.elt.style.cursor = "grab";
+    } else {
+      canvas.elt.style.cursor = "auto";
+    };
+  }
+}
+
+
+class addBeamButton{
+  constructor(canvas, beam) {
+    this.x = 15;
+    this.y = 25;
+    this.r1 = 9;
+    this.r2 = 12;
+    this.fill = "tomato";
+    this.color = "white";
+    this.highlightFill = "orangered";
+    this.normalFill = "tomato";
+    this.activeFill = "darkred";
+    this.lineWidth = 1.3;
+    this.edgeWidth = .8;
+    this.canvas = canvas;
+    this.ctx = (canvas.elt!=undefined)? canvas.elt.getContext("2d"): canvas.getContext("2d");
+    this.beam = beam;
+    beam.addButton = this;
+    buttons.push(this);
+  }
+  draw() {
+    const canvas = this.canvas;
+    canvas.translate(this.beam.origin.x, this.beam.origin.y);
+    canvas.rotate(this.beam.direction.heading()+PI/2);
+    this.updateColor();
+    this.drawBackground();
+    this.drawInterior();
+    if (this.isMouseOver()){
+      this.mouseIsOver = true;
+    } else {
+      this.mouseIsOver = false;
+    }
+    canvas.rotate(-this.beam.direction.heading()-PI/2);
+    canvas.translate(-this.beam.origin.x, -this.beam.origin.y);
+    canvas.elt.getContext("2d").beginPath();
+  }
+  isMouseOver(){
+    let correc = pixelDensity(); //Correction factor
+    const xyMouse = invertCoordinates((mouseX-10) * correc, (mouseY-10) * correc, this.canvas);
+    const xyButton = [this.x, this.y];
+    if ((xyMouse[0] - xyButton[0]) ** 2 + (xyMouse[1] - xyButton[1]) ** 2 <= this.r2 ** 2) {
+      return true;
+    } else {
+      return false;
+    };
+  }
+  updateColor(){
+    if (this.isMouseOver()) {
+      this.fill = this.highlightFill;
+    } else {
+      this.fill = this.normalFill;
+      return;
+    };
+    if (mouseIsPressed){
+      this.fill = this.activeFill;
+    };
+  }
+  drawBackground() {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.fillStyle = this.fill;
+    ctx.lineWidth = this.contourWidth;
+    ctx.arc(this.x, this.y, this.r2, 0, PI * 2);
+    ctx.stroke();
+    ctx.fill();
+  }
+  drawInterior (){
+    const ctx = this.ctx;
+    ctx.lineWidth = this.lineWidth;
+    ctx.strokeStyle = this.color;
+    ctx.beginPath();
+    ctx.translate(this.x, this.y);
+    const dh = this.r1 / 5;
+    for (var i = 1; i <= 4; i++) {
+      ctx.moveTo(0, 0);
+      ctx.lineTo(this.r1, 0);
+      ctx.rotate(PI / 2);
+    };
+    ctx.translate(-this.x, -this.y);
+    ctx.stroke();
+  }
+  handleMousePress(){
+    const beam = this.beam;
+    beam.numRays++;
+    beam.initRays();
+    beam.cast(beam.scene.mirrors);
+    this.beingDragged = true;
+  }
+  handleMouseDrag(){
+    //Nothing specific;
+    return;
+  }
+  mouseReleased(){
+    this.beingDragged = false;
+  }
+  updateCursor(){
+    const canvas = document.getElementById("defaultCanvas0");
+    if (canvas.elt.style.cursor != "auto"){return;};
+    if (this.beingDragged){
+      canvas.elt.style.cursor ="pointer"
+    } else if (this.mouseIsOver){
+      canvas.elt.style.cursor = "pointer";
+    } else {
+      canvas.elt.style.cursor = "auto";
+    };
+  }
+}
+
+class subBeamButton{
+  constructor(canvas, beam) {
+    this.x = -15;
+    this.y = 25;
+    this.r1 = 9;
+    this.r2 = 12;
+    this.fill = "mediumorchid";
+    this.color = "white";
+    this.highlightFill = "purple";
+    this.normalFill = "mediumorchid";
+    this.activeFill = "indigo";
+    this.lineWidth = 1.3;
+    this.edgeWidth = .8;
+    this.canvas = canvas;
+    this.ctx = (canvas.elt!=undefined)? canvas.elt.getContext("2d"): canvas.getContext("2d");
+    this.beam = beam;
+    beam.subButton = this;
+    buttons.push(this);
+  }
+  draw() {
+    const canvas = this.canvas;
+    canvas.translate(this.beam.origin.x, this.beam.origin.y);
+    canvas.rotate(this.beam.direction.heading()+PI/2);
+    this.updateColor();
+    this.drawBackground();
+    this.drawInterior();
+    if (this.isMouseOver()){
+      this.mouseIsOver = true;
+    } else {
+      this.mouseIsOver = false;
+    }
+    canvas.rotate(-this.beam.direction.heading()-PI/2);
+    canvas.translate(-this.beam.origin.x, -this.beam.origin.y);
+    canvas.elt.getContext("2d").beginPath();
+  }
+  isMouseOver(){
+    let correc = pixelDensity(); //Correction factor
+    const xyMouse = invertCoordinates((mouseX-10) * correc, (mouseY-10) * correc, this.canvas);
+    const xyButton = [this.x, this.y];
+    if ((xyMouse[0] - xyButton[0]) ** 2 + (xyMouse[1] - xyButton[1]) ** 2 <= this.r2 ** 2) {
+      return true;
+    } else {
+      return false;
+    };
+  }
+  updateColor(){
+    if (this.isMouseOver()) {
+      this.fill = this.highlightFill;
+    } else {
+      this.fill = this.normalFill;
+      return;
+    };
+    if (mouseIsPressed){
+      this.fill = this.activeFill;
+    };
+  }
+  drawBackground() {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.fillStyle = this.fill;
+    ctx.lineWidth = this.contourWidth;
+    ctx.arc(this.x, this.y, this.r2, 0, PI * 2);
+    ctx.stroke();
+    ctx.fill();
+  }
+  drawInterior (){
+    const ctx = this.ctx;
+    ctx.lineWidth = this.lineWidth;
+    ctx.strokeStyle = this.color;
+    ctx.beginPath();
+    ctx.translate(this.x, this.y);
+    const dh = this.r1 / 5;
+    for (var i = 1; i <= 2; i++) {
+      ctx.moveTo(0, 0);
+      ctx.lineTo(this.r1, 0);
+      ctx.rotate(PI);
+    };
+    ctx.translate(-this.x, -this.y);
+    ctx.stroke();
+  }
+  handleMousePress(){
+    const beam = this.beam;
+    const scene = this.beam.scene;
+    if (beam.numRays>1){
+      beam.numRays--;
+    } else {return;};
+    beam.initRays();
+    beam.cast(scene.mirrors);
+  }
+  handleMouseDrag(){
+    //Nothing specific;
+    return;
+  }
+  mouseReleased(){
+    this.beingDragged = false;
+  }
+  updateCursor(){
+    const canvas = document.getElementById("defaultCanvas0");
+    if (canvas.elt.style.cursor != "auto"){return;};
+    if (this.beingDragged){
+      canvas.elt.style.cursor ="pointer"
+    } else if (this.mouseIsOver){
+      canvas.elt.style.cursor = "pointer";
+    } else {
+      canvas.elt.style.cursor = "auto";
+    };
+  }
+}
+
+/*Now we can sense when the mouse is close enough. Now we need a funciton to draw the buttons*/
+function setup() {
+  bgCanvas = createCanvas(W, H);
+  bgCanvas.isMouseOver = true;
+  //bgCanvas.parent("simwrapper");
+
+  simCanvas = createGraphics(Wsim, Hsim)
+
+  plotCanvas = createGraphics(Wplot, Hplot)
+  plotCanvas.background(20)
+  plotCanvas.stroke(255)
+  plotCanvas.strokeWeight(3)
+  plotCanvas.noFill()
+  plotCanvas.rect(0, 0, Wplot, Hplot)
+
+  const m1Concave = new SphericalMirror(
+    createVector(350, 200),
+    createVector(550, 250),
+    createVector(350, 300),
+    false, // is convex
+  )
+  const m2Convex = new SphericalMirror(
+    createVector(100, 120),
+    createVector(150, 250),
+    createVector(100, 330),
+    true, // is convex
+  )
+  beam = new Beam(createVector(250, 450), createVector(-1, -2), 10, 40);
+  scene = new Scene(
+    [beam,],
+    [m1Concave,m2Convex,
+      new Mirror(createVector(50, 500), createVector(550, 500)),
+      new Mirror(createVector(550, 100), createVector(50, 100)),
+    ],
+    beam
+  );
+  const rotateButton = new rotateBeamButton(
+    simCanvas, beam
+  );
+
+  const translateButton = new translateBeamButton(
+    simCanvas, beam
+  );
+  const addButton = new addBeamButton(
+    simCanvas, beam
+  );
+  const subButton = new subBeamButton(
+    simCanvas, beam
+  ) //Buttons are automatically stored in an array
+}
+
+
+function invertCoordinates(x, y, canvas) {
+  const ctx = canvas.elt.getContext("2d");
+  const t = ctx.getTransform(); //transform
+  const M = t.a * t.d - t.b * t.c; //Factor that shows up a lot
+  const xnew = (x * t.d - y * t.c + t.c * t.f - t.d * t.e) / M;
+  const ynew = (-x * t.b + y * t.a + t.b * t.e - t.a * t.f) / M;
+  return [xnew, ynew];
+};
+
+//Now we override the original draw function to include the buttons
+function draw() {
+  background(20);
+  stroke(255)
+  strokeWeight(2)
+  noFill()
+  rect(10, 10, Wsim, Hsim)
+
+  simCanvas.clear()
+  scene.draw(simCanvas);
+  //scene.updateSampleRayDirection(0, mouseX, mouseY);
+  for (let button of buttons){
+    button.draw();
+  }
+  image(simCanvas, 10, 10);
+}
+
+function mousePressed(){
+  for (let button of buttons){
+    if (button.mouseIsOver){
+      button.handleMousePress();
+      break;
+    };
+  };
+};
+
+function mouseDragged(){
+  for (let button of buttons){
+    if (button.beingDragged){
+      button.handleMouseDrag();
+      break;
+    };
+  };
+}
+
+function mouseReleased(){
+  for (let button of buttons){
+    button.mouseReleased();
+  };
+};
