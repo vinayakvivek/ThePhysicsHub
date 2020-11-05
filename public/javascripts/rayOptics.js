@@ -48,10 +48,8 @@ function setup() {
     [
       m1Concave,
       m2Convex,
-      new Mirror(createVector(50, 500), createVector(550, 500)),
-      new Mirror(createVector(550, 100), createVector(50, 100)),
-      // new Mirror(createVector(100, 200), createVector(100, 400)),
-      // new Mirror(createVector(350, 200), createVector(500, 400)),
+      new PlaneMirror(createVector(50, 500), createVector(550, 500)),
+      new PlaneMirror(createVector(550, 100), createVector(50, 100)),
     ]
   );
 }
@@ -65,7 +63,8 @@ function draw() {
 
   simCanvas.clear()
   scene.draw(simCanvas);
-  scene.updateSampleRayDirection(0, mouseX, mouseY);
+  // scene.updateSampleRayDirection(0, mouseX, mouseY);
+  // scene.translateSampleRay(0, random(-5, 5),  random(-5, 5));
   image(simCanvas, 10, 10);
 }
 
@@ -83,6 +82,12 @@ class Scene {
     this.rays[index].cast(this.mirrors);
   }
 
+  // just for testing
+  translateSampleRay(index, dx, dy) {
+    this.rays[index].translate(dx, dy);
+    this.rays[index].cast(this.mirrors);
+  }
+
   draw(canvas) {
     this.mirrors.forEach(m => m.draw(canvas));
     this.rays.forEach(r => r.draw(canvas));
@@ -91,7 +96,19 @@ class Scene {
 
 class Mirror {
 
+  intersectRay(ray) {
+    console.error('Ray intersection not implemented');
+  }
+
+  draw(canvas) {
+    console.error('Draw method not implemented');
+  }
+}
+
+class PlaneMirror extends Mirror {
+
   constructor(start, end) {
+    super();
     this.start = start;
     this.end = end;
     this.direction = _V.sub(end, start).normalize(); // direction parallel to mirror;
@@ -178,10 +195,11 @@ function findCircle(x1, y1, x2, y2, x3, y3) {
   }
 }
 
-class SphericalMirror {
+class SphericalMirror extends Mirror {
 
   // p1, p2, p3 are position vectors of points on the circumference
   constructor(p1, p2, p3, isConvex = true) {
+    super();
     this.reset(p1, p2, p3, isConvex);
   }
 
@@ -315,6 +333,11 @@ class Ray {
     this.resetEnd();
   }
 
+  translate(dx, dy) {
+    this.origin.add(createVector(dx, dy));
+    this.resetEnd();
+  }
+
   resetEnd() {
     this.end = _V.mult(this.direction, MAX_LENGTH).add(this.origin);
     this.updateArrowPos();
@@ -400,6 +423,11 @@ class Beam {
   updateDirection(x, y) {
     const dir = createVector(x, y).sub(this.origin);
     this.direction = dir.normalize();
+    this.initRays();
+  }
+
+  translate(dx, dy) {
+    this.origin.add(createVector(dx, dy));
     this.initRays();
   }
 
