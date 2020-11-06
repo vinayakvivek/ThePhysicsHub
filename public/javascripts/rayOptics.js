@@ -11,6 +11,8 @@ const _V = p5.Vector;
 const MAX_LENGTH = 2000;
 const MAX_RAY_LEVEL = 5;
 const EPSILON = 1e-5;
+const SHOW_RAY_SOURCES = false;  // to show ray reflection points
+const SHOW_BOUNDS = false;
 let scene;
 
 function setup() {
@@ -40,13 +42,11 @@ function setup() {
     createVector(100, 330),
     true, // is convex
   )
-  const beam = new Beam(createVector(250, 450), createVector(-1, -2), 10, 40);
   scene = new Scene(
     [
       // new Ray(createVector(300, 300), createVector(-13, 50)),
-      // new Ray(createVector(550, 300), createVector(-100, -20)),
-      // beam1,
-      beam,
+      new Ray('ray1', createVector(450, 270), createVector(-100, -20)),
+      // new Beam(createVector(250, 450), createVector(-1, -2), 10, 40),
     ],
     [
       m1Concave,
@@ -69,7 +69,7 @@ function draw() {
   // scene.updateSampleRayDirection(0, mouseX, mouseY);
   // scene.translateSampleRay(0, random(-5, 5),  random(-5, 5));
   image(simCanvas, CANVAS_OFFSET, CANVAS_OFFSET);
-  // scene.handleClick(mouseX - CANVAS_OFFSET, mouseY - CANVAS_OFFSET);
+  // mouseClicked();
 }
 
 function mouseClicked() {
@@ -114,6 +114,10 @@ class Scene {
     this.mirrors.forEach(m => {
       if (m.isPointInside(x, y))
         console.log(m.name);
+    })
+    this.rays.forEach(r => {
+      if (r.isPointInside(x, y))
+        console.log(r.name);
     })
   }
 
@@ -414,19 +418,21 @@ class SphericalMirror extends Mirror {
 
 }
 
-class Ray {
+class Ray extends SelectableEntity {
 
-  constructor(origin, direction, level = 0) {
+  constructor(name, origin, direction, level = 0) {
+    super(name);
     this.origin = origin.copy();
     this.direction = direction.copy().normalize();
     this.level = level;
     this.rayColor = color(247, 213, 74, 255 * max(0.1, 1 - level / MAX_RAY_LEVEL));
-    this.resetEnd();
+    this.boundsOffset = 15;
+    this.reset();
   }
 
   updateOrigin(o) {
     this.origin = o;
-    this.resetEnd();
+    this.reset();
   }
 
   // (x, y) point in space
@@ -434,15 +440,15 @@ class Ray {
   updateDirection(x, y) {
     const dir = createVector(x, y).sub(this.origin);
     this.direction = dir.normalize();
-    this.resetEnd();
+    this.reset();
   }
 
   translate(dx, dy) {
     this.origin.add(createVector(dx, dy));
-    this.resetEnd();
+    this.reset();
   }
 
-  resetEnd() {
+  reset() {
     this.end = _V.mult(this.direction, MAX_LENGTH).add(this.origin);
     this.updateArrowPos();
     this.next = null;
@@ -484,18 +490,37 @@ class Ray {
     }
     if (canReflect) {
       const r = _V.sub(this.direction, _V.mult(n, 2 * _V.dot(this.direction, n)));
-      this.next = new Ray(this.end, r, this.level + 1);
+      const nextName = `${this.name.split('_')[0]}_${this.level + 1}`;
+      this.next = new Ray(nextName, this.end, r, this.level + 1);
       this.next.cast(mirrors);
     }
   }
 
-  draw(canvas, showSource = true) {
+  isPointInside(x, y) {
+    return createVector(x, y).sub(this.origin).mag() < this.boundsOffset;
+  }
+
+  drawBounds(canvas) {
+    canvas.push();
+    canvas.strokeWeight(1);
+    canvas.noFill();
+    canvas.circle(this.origin.x, this.origin.y, this.boundsOffset);
+    canvas.pop();
+  }
+
+  draw(canvas) {
     canvas.push();
     canvas.stroke(this.rayColor);
     canvas.strokeWeight(1);
-    if (showSource) {
-      canvas.ellipse(this.origin.x, this.origin.y, 3, 3);
+    if (this.level === 0) {
+      // source ray
+      canvas.ellipse(this.origin.x, this.origin.y, 5, 5);
+      SHOW_BOUNDS && this.drawBounds(canvas);
+    } else {
+      // reflected ray
+      SHOW_RAY_SOURCES && canvas.ellipse(this.origin.x, this.origin.y, 3, 3);
     }
+
     canvas.line(this.origin.x, this.origin.y, this.end.x, this.end.y);
     // draw arrow
     canvas.push()
