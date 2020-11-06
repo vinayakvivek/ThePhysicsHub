@@ -27,12 +27,14 @@ function setup() {
   plotCanvas.rect(0, 0, Wplot, Hplot)
 
   const m1Concave = new SphericalMirror(
+    'concave1',
     createVector(350, 200),
     createVector(550, 250),
     createVector(350, 300),
     false, // is convex
   )
   const m2Convex = new SphericalMirror(
+    'convex1',
     createVector(100, 120),
     createVector(150, 250),
     createVector(100, 330),
@@ -49,8 +51,8 @@ function setup() {
     [
       m1Concave,
       m2Convex,
-      new PlaneMirror(createVector(50, 500), createVector(550, 500)),
-      new PlaneMirror(createVector(550, 100), createVector(50, 100)),
+      new PlaneMirror('pm1', createVector(50, 500), createVector(550, 500)),
+      new PlaneMirror('pm2', createVector(550, 100), createVector(50, 100)),
     ]
   );
 }
@@ -109,10 +111,10 @@ class Scene {
   }
 
   handleClick(x, y) {
-    // this.mirrors.forEach(m => {
-    //   console.log(m.isPointInside(x, y));
-    // })
-    console.log(this.mirrors[1].isPointInside(x, y));
+    this.mirrors.forEach(m => {
+      if (m.isPointInside(x, y))
+        console.log(m.name);
+    })
   }
 
   draw(canvas) {
@@ -123,7 +125,8 @@ class Scene {
 
 class SelectableEntity {
 
-  constructor() {
+  constructor(name) {
+    this.name = name;
   }
 
   // is the mouse click on (x, y) inside the entity
@@ -138,6 +141,10 @@ class SelectableEntity {
 
 class Mirror extends SelectableEntity {
 
+  constructor(name) {
+    super(name);
+  }
+
   intersectRay(ray) {
     console.error('Ray intersection not implemented');
   }
@@ -149,8 +156,8 @@ class Mirror extends SelectableEntity {
 
 class PlaneMirror extends Mirror {
 
-  constructor(start, end) {
-    super();
+  constructor(name, start, end) {
+    super(name);
     this.start = start.copy();
     this.end = end.copy();
     this.direction = _V.sub(end, start).normalize(); // direction parallel to mirror;
@@ -184,7 +191,10 @@ class PlaneMirror extends Mirror {
   }
 
   isPointInside(x, y) {
-    return true;
+    const p = createVector(x, y);
+    const [A, B, C, D] = this.boundingBox;
+    return isPointOnRight(B, A, p) && isPointOnRight(C, B, p)
+      && isPointOnRight(D, C, p) && isPointOnRight(A, D, p);
   }
 
   intersectRay(ray) {
@@ -265,8 +275,8 @@ function findCircle(x1, y1, x2, y2, x3, y3) {
 class SphericalMirror extends Mirror {
 
   // p1, p2, p3 are position vectors of points on the circumference
-  constructor(p1, p2, p3, isConvex = true) {
-    super();
+  constructor(name, p1, p2, p3, isConvex = true) {
+    super(name);
     this.reset(p1, p2, p3, isConvex);
   }
 
