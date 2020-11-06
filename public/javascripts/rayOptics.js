@@ -95,6 +95,7 @@ class Scene {
   constructor(rays, mirrors) {
     this.rays = rays;
     this.mirrors = mirrors;
+    this.buttonGroup = new ButtonGroup();
     this.update();
   }
 
@@ -111,14 +112,19 @@ class Scene {
   }
 
   handleClick(x, y) {
+    let selected = null;
+    // TODO: optimize looping
     this.mirrors.forEach(m => {
-      if (m.isPointInside(x, y))
-        console.log(m.name);
+      if (m.isPointInside(x, y)) {
+        selected = m;
+      }
     })
     this.rays.forEach(r => {
-      if (r.isPointInside(x, y))
-        console.log(r.name);
+      if (r.isPointInside(x, y)) {
+        selected = r;
+      }
     })
+    this.buttonGroup.setEntity(selected);
   }
 
   /**
@@ -132,6 +138,27 @@ class Scene {
   draw(canvas) {
     this.mirrors.forEach(m => m.draw(canvas));
     this.rays.forEach(r => r.draw(canvas));
+    this.buttonGroup.draw(canvas);
+  }
+}
+
+class ButtonGroup {
+
+  constructor() {
+    this.setEntity(null);
+  }
+
+  setEntity(entity) {
+    this.entity = entity;
+    this.location = entity ? entity.buttonLocation : null;
+  }
+
+  draw(canvas) {
+    if (!this.entity || !this.location) return;
+    canvas.push();
+    canvas.fill(255, 255, 0);
+    canvas.rect(this.location.x, this.location.y, 50, 20);
+    canvas.pop();
   }
 }
 
@@ -139,6 +166,10 @@ class SelectableEntity {
 
   constructor(name) {
     this.name = name;
+  }
+
+  get buttonLocation() {
+    console.error('Button location getter not implemented');
   }
 
   // is the mouse click on (x, y) inside the entity
@@ -188,18 +219,8 @@ class PlaneMirror extends Mirror {
     this.boundingBox = [A, B, C, D];
   }
 
-  drawBounds(canvas) {
-    canvas.push();
-    const [A, B, C, D] = this.boundingBox;
-    canvas.noFill();
-    canvas.stroke(255);
-    canvas.beginShape();
-    canvas.vertex(A.x, A.y);
-    canvas.vertex(B.x, B.y);
-    canvas.vertex(C.x, C.y);
-    canvas.vertex(D.x, D.y);
-    canvas.endShape(CLOSE);
-    canvas.pop();
+  get buttonLocation() {
+    return this.boundingBox[0];
   }
 
   isPointInside(x, y) {
@@ -224,6 +245,20 @@ class PlaneMirror extends Mirror {
       t: t1,
       n: this.normal.copy()
     };
+  }
+
+  drawBounds(canvas) {
+    canvas.push();
+    const [A, B, C, D] = this.boundingBox;
+    canvas.noFill();
+    canvas.stroke(255);
+    canvas.beginShape();
+    canvas.vertex(A.x, A.y);
+    canvas.vertex(B.x, B.y);
+    canvas.vertex(C.x, C.y);
+    canvas.vertex(D.x, D.y);
+    canvas.endShape(CLOSE);
+    canvas.pop();
   }
 
   draw(canvas) {
@@ -332,6 +367,10 @@ class SphericalMirror extends Mirror {
     canvas.arc(0, 0, d1, d1, this.arcStart, this.arcEnd);
     canvas.arc(0, 0, d2, d2, this.arcStart, this.arcEnd);
     canvas.pop();
+  }
+
+  get buttonLocation() {
+    return this.p3;
   }
 
   isPointInside(x, y) {
@@ -504,6 +543,10 @@ class Ray extends SelectableEntity {
     }
   }
 
+  get buttonLocation() {
+    return this.origin;
+  }
+
   isPointInside(x, y) {
     return createVector(x, y).sub(this.origin).mag() < this.boundsOffset;
   }
@@ -602,6 +645,10 @@ class Beam extends SelectableEntity {
 
   cast(mirrors) {
     this.rays.forEach(r => r.cast(mirrors));
+  }
+
+  get buttonLocation() {
+    return this.boundingBox[0];
   }
 
   isPointInside(x, y) {
