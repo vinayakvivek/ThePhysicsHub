@@ -46,7 +46,7 @@ function setup() {
     [
       // new Ray(createVector(300, 300), createVector(-13, 50)),
       new Ray('ray1', createVector(450, 270), createVector(-100, -20)),
-      // new Beam(createVector(250, 450), createVector(-1, -2), 10, 40),
+      new Beam('beam1', createVector(250, 450), createVector(-1, -2), 10, 40),
     ],
     [
       m1Concave,
@@ -95,7 +95,7 @@ class Scene {
   constructor(rays, mirrors) {
     this.rays = rays;
     this.mirrors = mirrors;
-    rays.forEach(r => r.cast(mirrors));
+    this.update();
   }
 
   // just for testing
@@ -119,6 +119,14 @@ class Scene {
       if (r.isPointInside(x, y))
         console.log(r.name);
     })
+  }
+
+  /**
+   * casts all rays onto scene mirrors
+   * *important* This must be called if any of the mirrors are updated
+   */
+  update() {
+    this.rays.forEach(r => r.cast(this.mirrors));
   }
 
   draw(canvas) {
@@ -419,11 +427,12 @@ class SphericalMirror extends Mirror {
 
 class Ray extends SelectableEntity {
 
-  constructor(name, origin, direction, level = 0) {
+  constructor(name, origin, direction, level = 0, sourceName = null) {
     super(name);
     this.origin = origin.copy();
     this.direction = direction.copy().normalize();
     this.level = level;
+    this.sourceName = sourceName || name;
     this.rayColor = color(247, 213, 74, 255 * max(0.1, 1 - level / MAX_RAY_LEVEL));
     this.boundsOffset = 15;
     this.reset();
@@ -489,8 +498,8 @@ class Ray extends SelectableEntity {
     }
     if (canReflect) {
       const r = _V.sub(this.direction, _V.mult(n, 2 * _V.dot(this.direction, n)));
-      const nextName = `${this.name.split('_')[0]}_${this.level + 1}`;
-      this.next = new Ray(nextName, this.end, r, this.level + 1);
+      const nextName = `${this.sourceName}_${this.level + 1}`;
+      this.next = new Ray(nextName, this.end, r, this.level + 1, this.sourceName);
       this.next.cast(mirrors);
     }
   }
@@ -537,15 +546,27 @@ class Ray extends SelectableEntity {
   }
 }
 
-class Beam {
+class Beam extends SelectableEntity {
 
-  constructor(origin, direction, numRays = 5, width = 25) {
+  constructor(name, origin, direction, numRays = 5, width = 25) {
+    super(name);
     this.origin = origin.copy();
     this.direction = direction.copy().normalize();
     this.numRays = numRays;
     this.width = width;
     this.rays = [];
     this.initRays();
+    this.initBoundingBox();
+  }
+
+  initBoundingBox() {
+    const offset = 7;
+    const n = this.direction.copy().rotate(-PI / 2);
+    const A = _V.add(this.origin, _V.mult(this.direction, -offset)).add(_V.mult(n, -offset - this.width/2));
+    const B = _V.add(A, _V.mult(n, this.width + offset * 2));
+    const C = _V.add(B, _V.mult(this.direction, offset * 2));
+    const D = _V.add(C, _V.mult(n, -this.width -offset * 2));
+    this.boundingBox = [A, B, C, D];
   }
 
   updateDirection(x, y) {
@@ -566,14 +587,14 @@ class Beam {
     if (this.width < 1 || this.numRays <= 0) return;
     if (this.numRays === 1) {
       // if only one ray, width does not matter
-      this.rays.push(new Ray(this.origin, this.direction));
+      this.rays.push(new Ray(`${name}_ray1`, this.origin, this.direction));
       return;
     }
     this.start = _V.mult(this.normal, - this.width / 2).add(this.origin);
     const posV = this.start.copy();
     const stepV = _V.mult(this.normal, this.width / (this.numRays - 1));
     for (let i = 0; i < this.numRays; ++i) {
-      this.rays.push(new Ray(posV, this.direction));
+      this.rays.push(new Ray(`${name}_ray${i + 1}`, posV, this.direction, 1));
       posV.add(stepV);
     }
     this.end = posV.copy().sub(stepV);
@@ -583,8 +604,30 @@ class Beam {
     this.rays.forEach(r => r.cast(mirrors));
   }
 
+  isPointInside(x, y) {
+    const p = createVector(x, y);
+    const [A, B, C, D] = this.boundingBox;
+    return isPointOnRight(B, A, p) && isPointOnRight(C, B, p)
+      && isPointOnRight(D, C, p) && isPointOnRight(A, D, p);
+  }
+
+  drawBounds(canvas) {
+    canvas.push();
+    const [A, B, C, D] = this.boundingBox;
+    canvas.noFill();
+    canvas.stroke(255);
+    canvas.beginShape();
+    canvas.vertex(A.x, A.y);
+    canvas.vertex(B.x, B.y);
+    canvas.vertex(C.x, C.y);
+    canvas.vertex(D.x, D.y);
+    canvas.endShape(CLOSE);
+    canvas.pop();
+  }
+
   draw(canvas) {
     canvas.push();
+    SHOW_BOUNDS && this.drawBounds(canvas);
     canvas.stroke(0, 255, 0);
     canvas.strokeWeight(3);
     canvas.line(this.start.x, this.start.y, this.end.x, this.end.y);
