@@ -4,6 +4,7 @@ const Wsim = W * 0.69 - 20;
 const Hsim = H - 15;
 const Wplot = 0.25 * W
 const Hplot = 0.875 * H
+const CANVAS_OFFSET = 10;
 let bgCanvas, simCanvas, plotCanvas;
 
 const _V = p5.Vector;
@@ -65,9 +66,28 @@ function draw() {
   scene.draw(simCanvas);
   // scene.updateSampleRayDirection(0, mouseX, mouseY);
   // scene.translateSampleRay(0, random(-5, 5),  random(-5, 5));
-  image(simCanvas, 10, 10);
+  image(simCanvas, CANVAS_OFFSET, CANVAS_OFFSET);
+  // scene.handleClick(mouseX - CANVAS_OFFSET, mouseY - CANVAS_OFFSET);
 }
 
+function mouseClicked() {
+  scene.handleClick(mouseX - CANVAS_OFFSET, mouseY - CANVAS_OFFSET);
+}
+
+// Custom methods and classes ---------
+
+// test whether a point lies on the right of a line
+// line from v2 to v1
+function isPointOnRight(v1, v2, p) {
+  return _V.sub(v1, v2).cross(_V.sub(p, v2)).z > 0;
+}
+
+/**
+ * Scene class contains every entity in the simulation like rays, mirrors, etc.
+ *
+ * Any methods which update entity position/rotation,
+ * must call `cast` method on rays and pass mirrors as arguments
+ */
 class Scene {
 
   constructor(rays, mirrors) {
@@ -88,6 +108,13 @@ class Scene {
     this.rays[index].cast(this.mirrors);
   }
 
+  handleClick(x, y) {
+    // this.mirrors.forEach(m => {
+    //   console.log(m.isPointInside(x, y));
+    // })
+    console.log(this.mirrors[1].isPointInside(x, y));
+  }
+
   draw(canvas) {
     this.mirrors.forEach(m => m.draw(canvas));
     this.rays.forEach(r => r.draw(canvas));
@@ -100,32 +127,12 @@ class SelectableEntity {
   }
 
   // is the mouse click on (x, y) inside the entity
-  isInsideBoundingBox(x, y) {
+  isPointInside(x, y) {
+    console.error('Bound check method not implemented');
   }
 
-  drawBoundingBox(canvas) {
-    canvas.push();
-    const A = this.boundingBox[0];
-    const B = this.boundingBox[1];
-    const C = this.boundingBox[2];
-    const D = this.boundingBox[3];
-    canvas.ellipse(A.x, A.y, 10);
-    canvas.fill(255, 255, 0);
-    canvas.ellipse(B.x, B.y, 10);
-    canvas.fill(0, 255, 0);
-    canvas.ellipse(C.x, C.y, 10);
-    canvas.fill(0, 255, 255);
-    canvas.ellipse(D.x, D.y, 10);
-
-    canvas.noFill();
-    canvas.stroke(255);
-    canvas.beginShape();
-    canvas.vertex(A.x, A.y);
-    canvas.vertex(B.x, B.y);
-    canvas.vertex(C.x, C.y);
-    canvas.vertex(D.x, D.y);
-    canvas.endShape(CLOSE);
-    canvas.pop();
+  drawBounds(canvas) {
+    console.error('Bound draw not implemented');
   }
 }
 
@@ -150,13 +157,6 @@ class PlaneMirror extends Mirror {
     this.normal = this.direction.copy().rotate(-HALF_PI);
     this.length = _V.dist(start, end);
     this.shadeDirection = this.direction.copy().rotate(3 * PI / 4);
-
-    this.boundingBox = [
-      createVector(0, 0),
-      createVector(0, 0),
-      createVector(0, 0),
-      createVector(0, 0),
-    ];
     this.initBoundingBox();
   }
 
@@ -166,10 +166,25 @@ class PlaneMirror extends Mirror {
     const B = _V.add(A, _V.mult(this.normal, offset * 2));
     const C = _V.add(B, _V.mult(this.direction, offset * 2 + this.length));
     const D = _V.add(C, _V.mult(this.normal, -offset * 2));
-    this.boundingBox[0] = A;
-    this.boundingBox[1] = B;
-    this.boundingBox[2] = C;
-    this.boundingBox[3] = D;
+    this.boundingBox = [A, B, C, D];
+  }
+
+  drawBounds(canvas) {
+    canvas.push();
+    const [A, B, C, D] = this.boundingBox;
+    canvas.noFill();
+    canvas.stroke(255);
+    canvas.beginShape();
+    canvas.vertex(A.x, A.y);
+    canvas.vertex(B.x, B.y);
+    canvas.vertex(C.x, C.y);
+    canvas.vertex(D.x, D.y);
+    canvas.endShape(CLOSE);
+    canvas.pop();
+  }
+
+  isPointInside(x, y) {
+    return true;
   }
 
   intersectRay(ray) {
@@ -192,7 +207,7 @@ class PlaneMirror extends Mirror {
   draw(canvas) {
     canvas.push();
     // TODO: draw bounding box only when required
-    this.drawBoundingBox(canvas);
+    this.drawBounds(canvas);
 
     canvas.stroke(255);
     canvas.strokeWeight(3);
@@ -209,12 +224,6 @@ class PlaneMirror extends Mirror {
     }
     canvas.pop();
   }
-}
-
-// test whether a point lies on the right of a line
-// line from v2 to v1
-function isPointOnRight(v1, v2, p) {
-  return _V.sub(v1, v2).cross(_V.sub(p, v2)).z > 0;
 }
 
 /**
@@ -288,6 +297,29 @@ class SphericalMirror extends Mirror {
 
     const a = v1.angleBetween(v3);
     this.arcAngle = a < 0 ? a + 2 * PI : a;
+
+    this.boundOffset = 10;
+  }
+
+  drawBounds(canvas) {
+    const offset = this.boundOffset * 2;
+    const d = this.r * 2;
+    const d1 = max(d - offset, 1);
+    const d2 = d + offset;
+    canvas.push();
+    canvas.strokeWeight(1);
+    canvas.arc(0, 0, d1, d1, this.arcStart, this.arcEnd);
+    canvas.arc(0, 0, d2, d2, this.arcStart, this.arcEnd);
+    canvas.pop();
+  }
+
+  isPointInside(x, y) {
+    const p = createVector(x, y);
+    if (!this.isPointOnArcSide(p)) {
+      return false;
+    }
+    const d = _V.dist(p, this.c);
+    return abs(d - this.r) < this.boundOffset;
   }
 
   isPointOnArcSide(p) {
@@ -345,9 +377,13 @@ class SphericalMirror extends Mirror {
 
     canvas.noFill();
     canvas.strokeWeight(3);
-    // circle(this.c.x, this.c.y, 2 * this.r);
+
     let d = 2 * this.r;
     canvas.translate(this.c.x, this.c.y);
+
+    this.drawBounds(canvas);
+
+    // main arc
     canvas.arc(0, 0, d, d, this.arcStart, this.arcEnd);
 
     // back shade
