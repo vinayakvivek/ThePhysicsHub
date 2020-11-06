@@ -220,8 +220,7 @@ class PlaneMirror extends Mirror {
 
   draw(canvas) {
     canvas.push();
-    // TODO: draw bounding box only when required
-    this.drawBounds(canvas);
+    SHOW_BOUNDS && this.drawBounds(canvas);
 
     canvas.stroke(255);
     canvas.strokeWeight(3);
@@ -395,7 +394,7 @@ class SphericalMirror extends Mirror {
     let d = 2 * this.r;
     canvas.translate(this.c.x, this.c.y);
 
-    this.drawBounds(canvas);
+    SHOW_BOUNDS && this.drawBounds(canvas);
 
     // main arc
     canvas.arc(0, 0, d, d, this.arcStart, this.arcEnd);
