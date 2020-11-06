@@ -94,7 +94,42 @@ class Scene {
   }
 }
 
-class Mirror {
+class SelectableEntity {
+
+  constructor() {
+  }
+
+  // is the mouse click on (x, y) inside the entity
+  isInsideBoundingBox(x, y) {
+  }
+
+  drawBoundingBox(canvas) {
+    canvas.push();
+    const A = this.boundingBox[0];
+    const B = this.boundingBox[1];
+    const C = this.boundingBox[2];
+    const D = this.boundingBox[3];
+    canvas.ellipse(A.x, A.y, 10);
+    canvas.fill(255, 255, 0);
+    canvas.ellipse(B.x, B.y, 10);
+    canvas.fill(0, 255, 0);
+    canvas.ellipse(C.x, C.y, 10);
+    canvas.fill(0, 255, 255);
+    canvas.ellipse(D.x, D.y, 10);
+
+    canvas.noFill();
+    canvas.stroke(255);
+    canvas.beginShape();
+    canvas.vertex(A.x, A.y);
+    canvas.vertex(B.x, B.y);
+    canvas.vertex(C.x, C.y);
+    canvas.vertex(D.x, D.y);
+    canvas.endShape(CLOSE);
+    canvas.pop();
+  }
+}
+
+class Mirror extends SelectableEntity {
 
   intersectRay(ray) {
     console.error('Ray intersection not implemented');
@@ -109,12 +144,32 @@ class PlaneMirror extends Mirror {
 
   constructor(start, end) {
     super();
-    this.start = start;
-    this.end = end;
+    this.start = start.copy();
+    this.end = end.copy();
     this.direction = _V.sub(end, start).normalize(); // direction parallel to mirror;
     this.normal = this.direction.copy().rotate(-HALF_PI);
     this.length = _V.dist(start, end);
     this.shadeDirection = this.direction.copy().rotate(3 * PI / 4);
+
+    this.boundingBox = [
+      createVector(0, 0),
+      createVector(0, 0),
+      createVector(0, 0),
+      createVector(0, 0),
+    ];
+    this.initBoundingBox();
+  }
+
+  initBoundingBox() {
+    const offset = 10;
+    const A = _V.add(this.start, _V.mult(this.direction, -offset)).add(_V.mult(this.normal, -offset));
+    const B = _V.add(A, _V.mult(this.normal, offset * 2));
+    const C = _V.add(B, _V.mult(this.direction, offset * 2 + this.length));
+    const D = _V.add(C, _V.mult(this.normal, -offset * 2));
+    this.boundingBox[0] = A;
+    this.boundingBox[1] = B;
+    this.boundingBox[2] = C;
+    this.boundingBox[3] = D;
   }
 
   intersectRay(ray) {
@@ -136,6 +191,9 @@ class PlaneMirror extends Mirror {
 
   draw(canvas) {
     canvas.push();
+    // TODO: draw bounding box only when required
+    this.drawBoundingBox(canvas);
+
     canvas.stroke(255);
     canvas.strokeWeight(3);
     canvas.translate(this.start.x, this.start.y);
