@@ -147,21 +147,28 @@ class Scene {
 
   handleMousePress() {
     this.buttonGroupActive = this.buttonGroup.isActive;
+    if (this.buttonGroupActive) {
+      this.buttonGroup.handleMousePress();
+    }
   }
 
   handleMouseDrag() {
-    // console.log('mouse drag');
+    if (this.buttonGroupActive) {
+      this.buttonGroup.handleMouseDrag();
+    }
   }
 
   handleMouseRelease() {
-    // console.log('mouse release');
+    if (this.buttonGroupActive) {
+      this.buttonGroup.handleMouseRelease();
+    }
   }
 
   /**
    * casts all rays onto scene mirrors
    * *important* This must be called if any of the mirrors are updated
    */
-  update() {
+  update = () => {
     this.rays.forEach(r => r.cast(this.mirrors));
   }
 
@@ -179,25 +186,36 @@ class ButtonGroup {
     this.height = 30;
     this.setEntity(null);
     this.isActive = false;
-    this.translateButton = new TranslateButton();
+    this.translateButton = new TranslateButton(this.translateEntity);
   }
 
   setEntity(entity) {
     this.entity = entity;
   }
 
-  isMouseOver(canvas) {
-    const [x, y] = invertCoordinates(...scene.mousePos, canvas);
+  translateEntity = (dx, dy) => {
+    this.entity.translate(dx, dy);
+    scene.update();
+  }
+
+  isMouseOver() {
+    if (!this.entity) return false;
+    const [mx, my] = scene.mousePos;
+    const location = this.entity.buttonLocation;
+    const [x, y] = [mx - location.x, my - location.y];
     return (x > 0 && x < this.width && y > 0 && y < this.height);
   }
 
   handleMousePress() {
+    this.translateButton.handleMousePress();
   }
 
   handleMouseDrag() {
+    this.translateButton.handleMouseDrag();
   }
 
   handleMouseRelease() {
+    this.translateButton.handleMouseRelease();
   }
 
   draw(canvas) {
@@ -209,7 +227,7 @@ class ButtonGroup {
     canvas.translate(location.x, location.y);
     canvas.rect(0, 0, this.width, this.height);
 
-    this.isActive = this.isMouseOver(canvas);
+    this.isActive = this.isMouseOver();
 
     canvas.translate(15, 15);
     this.translateButton.draw(canvas);
@@ -258,12 +276,32 @@ class Button {
 
 class TranslateButton extends Button {
 
-  constructor() {
+  constructor(translateEntity) {
     super();
+    this.translateEntity = translateEntity;
     this.fill = 'deepskyblue';
     this.highlightFill = 'cornflowerblue';
     this.normalFill = 'deepskyblue';
     this.activeFill = 'darkblue';
+  }
+
+  handleMousePress() {
+    console.log('YO');
+    if (!this.mouseIsOver) return;
+    this.lastPos = scene.mousePos;
+    this.active = true;
+  }
+
+  handleMouseDrag() {
+    if (!this.active) return;
+    const currPos = scene.mousePos;
+    const [dx, dy] = [currPos[0] - this.lastPos[0], currPos[1] - this.lastPos[1]];
+    this.lastPos = currPos;
+    this.translateEntity(dx, dy);
+  }
+
+  handleMouseRelease() {
+    this.active = false;
   }
 }
 
@@ -703,6 +741,10 @@ class Beam extends SelectableEntity {
     this.numRays = numRays;
     this.width = width;
     this.rays = [];
+    this.reset();
+  }
+
+  reset() {
     this.initRays();
     this.initBoundingBox();
   }
@@ -720,12 +762,12 @@ class Beam extends SelectableEntity {
   updateDirection(x, y) {
     const dir = createVector(x, y).sub(this.origin);
     this.direction = dir.normalize();
-    this.initRays();
+    this.reset();
   }
 
   translate(dx, dy) {
     this.origin.add(createVector(dx, dy));
-    this.initRays();
+    this.reset();
   }
 
   initRays() {
