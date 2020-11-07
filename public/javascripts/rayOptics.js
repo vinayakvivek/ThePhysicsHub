@@ -72,8 +72,21 @@ function draw() {
   // mouseClicked();
 }
 
+// Mouse interactions ------------
 function mouseClicked() {
-  scene.handleClick(mouseX - CANVAS_OFFSET, mouseY - CANVAS_OFFSET);
+  scene.handleClick();
+}
+
+function mousePressed() {
+  scene.handleMousePress();
+}
+
+function mouseDragged() {
+  scene.handleMouseDrag();
+}
+
+function mouseReleased() {
+  scene.handleMouseRelease();
 }
 
 // Custom methods and classes ---------
@@ -82,6 +95,17 @@ function mouseClicked() {
 // line from v2 to v1
 function isPointOnRight(v1, v2, p) {
   return _V.sub(v1, v2).cross(_V.sub(p, v2)).z > 0;
+}
+
+function invertCoordinates(x, y, canvas) {
+  x = x * pixelDensity();
+  y = y * pixelDensity();
+  const ctx = canvas.elt.getContext("2d");
+  const t = ctx.getTransform();  // transform
+  const M = t.a * t.d - t.b * t.c;  // Factor that shows up a lot
+  const x_t = (x * t.d - y * t.c + t.c * t.f - t.d * t.e) / M;
+  const y_t = (-x * t.b + y * t.a + t.b * t.e - t.a * t.f) / M;
+  return [x_t, y_t];
 }
 
 /**
@@ -95,36 +119,42 @@ class Scene {
   constructor(rays, mirrors) {
     this.rays = rays;
     this.mirrors = mirrors;
+    this.entities = [...rays, ...mirrors];
     this.buttonGroup = new ButtonGroup();
+    this.buttonGroupActive = false;
     this.update();
   }
 
-  // just for testing
-  updateSampleRayDirection(index, x, y) {
-    this.rays[index].updateDirection(x, y);
-    this.rays[index].cast(this.mirrors);
+  get mousePos() {
+    return [mouseX - CANVAS_OFFSET, mouseY - CANVAS_OFFSET];
   }
 
-  // just for testing
-  translateSampleRay(index, dx, dy) {
-    this.rays[index].translate(dx, dy);
-    this.rays[index].cast(this.mirrors);
-  }
-
-  handleClick(x, y) {
+  handleClick() {
+    if (this.buttonGroupActive) {
+      // button group is active, do nothing
+      return;
+    }
+    const [x, y] = this.mousePos;
     let selected = null;
     // TODO: optimize looping
-    this.mirrors.forEach(m => {
-      if (m.isPointInside(x, y)) {
-        selected = m;
-      }
-    })
-    this.rays.forEach(r => {
-      if (r.isPointInside(x, y)) {
-        selected = r;
+    this.entities.forEach(e => {
+      if (e.isPointInside(x, y)) {
+        selected = e;
       }
     })
     this.buttonGroup.setEntity(selected);
+  }
+
+  handleMousePress() {
+    this.buttonGroupActive = this.buttonGroup.isActive;
+  }
+
+  handleMouseDrag() {
+    // console.log('mouse drag');
+  }
+
+  handleMouseRelease() {
+    // console.log('mouse release');
   }
 
   /**
@@ -145,20 +175,95 @@ class Scene {
 class ButtonGroup {
 
   constructor() {
+    this.width = 50;
+    this.height = 30;
     this.setEntity(null);
+    this.isActive = false;
+    this.translateButton = new TranslateButton();
   }
 
   setEntity(entity) {
     this.entity = entity;
-    this.location = entity ? entity.buttonLocation : null;
+  }
+
+  isMouseOver(canvas) {
+    const [x, y] = invertCoordinates(...scene.mousePos, canvas);
+    return (x > 0 && x < this.width && y > 0 && y < this.height);
+  }
+
+  handleMousePress() {
+  }
+
+  handleMouseDrag() {
+  }
+
+  handleMouseRelease() {
   }
 
   draw(canvas) {
-    if (!this.entity || !this.location) return;
+    this.isActive = false;
+    if (!this.entity) return;
     canvas.push();
     canvas.fill(255, 255, 0);
-    canvas.rect(this.location.x, this.location.y, 50, 20);
+    const location = this.entity.buttonLocation;
+    canvas.translate(location.x, location.y);
+    canvas.rect(0, 0, this.width, this.height);
+
+    this.isActive = this.isMouseOver(canvas);
+
+    canvas.translate(15, 15);
+    this.translateButton.draw(canvas);
     canvas.pop();
+  }
+}
+
+class Button {
+
+  constructor() {
+    this.r1 = 9;
+    this.r2 = 10;
+    this.lineWidth = 1.3;
+    this.edgeWidth = 0.8;
+    this.fill = 'white';
+  }
+
+  isMouseOver(canvas) {
+    const mousePos = invertCoordinates(...scene.mousePos, canvas);
+    return mag(mousePos[0], mousePos[1]) < this.r2;
+  }
+
+  updateColor() {
+    if (this.mouseIsOver) {
+      this.fill = mouseIsPressed ? this.activeFill : this.highlightFill;
+    } else {
+      this.fill = this.normalFill;
+    }
+  }
+
+  drawBackground(canvas) {
+    canvas.push();
+    canvas.fill(this.fill);
+    canvas.circle(0, 0, this.r2 * 2);
+    canvas.pop();
+  }
+
+  draw(canvas) {
+    canvas.push();
+    this.mouseIsOver = this.isMouseOver(canvas);
+    this.updateColor();
+    this.drawBackground(canvas);
+    canvas.pop();
+  }
+}
+
+class TranslateButton extends Button {
+
+  constructor() {
+    super();
+    this.fill = 'deepskyblue';
+    this.highlightFill = 'cornflowerblue';
+    this.normalFill = 'deepskyblue';
+    this.activeFill = 'darkblue';
   }
 }
 
@@ -180,6 +285,10 @@ class SelectableEntity {
   drawBounds(canvas) {
     console.error('Bound draw not implemented');
   }
+
+  draw(canvas) {
+    console.error('Draw method not implemented');
+  }
 }
 
 class Mirror extends SelectableEntity {
@@ -190,10 +299,6 @@ class Mirror extends SelectableEntity {
 
   intersectRay(ray) {
     console.error('Ray intersection not implemented');
-  }
-
-  draw(canvas) {
-    console.error('Draw method not implemented');
   }
 }
 
