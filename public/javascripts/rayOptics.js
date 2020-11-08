@@ -192,6 +192,7 @@ class ButtonGroup {
     this.isActive = false;
     this.translateButton = new TranslateButton(this.translateEntity);
     this.rotateButton = new RotateButton(this.rotateEntity);
+    this.borderOffset = 10;
   }
 
   setEntity(entity) {
@@ -208,10 +209,20 @@ class ButtonGroup {
     scene.update();
   }
 
+  get location() {
+    if (!this.entity) return null;
+    // clip over canvas border
+    const pos = this.entity.buttonLocation.copy();
+    const bo = this.borderOffset;
+    pos.x = constrain(pos.x, bo, Wsim - this.width - bo);
+    pos.y = constrain(pos.y, bo, Hsim - this.height - bo);
+    return pos;
+  }
+
   isMouseOver() {
     if (!this.entity) return false;
     const [mx, my] = scene.mousePos;
-    const location = this.entity.buttonLocation;
+    const location = this.location;
     const [x, y] = [mx - location.x, my - location.y];
     return (x > 0 && x < this.width && y > 0 && y < this.height);
   }
@@ -238,7 +249,7 @@ class ButtonGroup {
     canvas.noFill();
     canvas.strokeWeight(1);
     canvas.stroke(255);
-    const location = this.entity.buttonLocation;
+    const location = this.location;
     canvas.translate(location.x, location.y);
     canvas.rect(0, 0, this.width, this.height);
 
@@ -905,9 +916,29 @@ class Beam extends SelectableEntity {
     this.reset();
   }
 
+  get buttonLocation() {
+    return this.boundingBox[0];
+  }
+
+  get centerLocation() {
+    return this.origin;
+  }
+
   translate(dx, dy) {
     this.origin.add(createVector(dx, dy));
     this.reset();
+  }
+
+  rotate(da) {
+    this.direction.rotate(da);
+    this.reset();
+  }
+
+  isPointInside(x, y) {
+    const p = createVector(x, y);
+    const [A, B, C, D] = this.boundingBox;
+    return isPointOnRight(B, A, p) && isPointOnRight(C, B, p)
+      && isPointOnRight(D, C, p) && isPointOnRight(A, D, p);
   }
 
   initRays() {
@@ -932,17 +963,6 @@ class Beam extends SelectableEntity {
 
   cast(mirrors) {
     this.rays.forEach(r => r.cast(mirrors));
-  }
-
-  get buttonLocation() {
-    return this.boundingBox[0];
-  }
-
-  isPointInside(x, y) {
-    const p = createVector(x, y);
-    const [A, B, C, D] = this.boundingBox;
-    return isPointOnRight(B, A, p) && isPointOnRight(C, B, p)
-      && isPointOnRight(D, C, p) && isPointOnRight(A, D, p);
   }
 
   drawBounds(canvas) {
