@@ -129,6 +129,10 @@ class Scene {
     return [mouseX - CANVAS_OFFSET, mouseY - CANVAS_OFFSET];
   }
 
+  get mousePosVec() {
+    return createVector(...this.mousePos);
+  }
+
   handleClick() {
     if (this.buttonGroupActive) {
       // button group is active, do nothing
@@ -200,7 +204,7 @@ class ButtonGroup {
   }
 
   rotateEntity = (da) => {
-    // this.entity.rotate(da);
+    this.entity.rotate(da);
     scene.update();
   }
 
@@ -214,12 +218,12 @@ class ButtonGroup {
 
   handleMousePress() {
     this.translateButton.handleMousePress();
-    this.rotateButton.handleMousePress();
+    this.rotateButton.handleMousePress(this.entity.centerLocation);
   }
 
   handleMouseDrag() {
     this.translateButton.handleMouseDrag();
-    this.rotateButton.handleMouseDrag();
+    this.rotateButton.handleMouseDrag(this.entity.centerLocation);
   }
 
   handleMouseRelease() {
@@ -353,9 +357,17 @@ class RotateButton extends Button {
     this.activeFill = 'darkgreen';
   }
 
-  handleMouseDrag() {
+  handleMousePress(center) {
+    super.handleMousePress();
+    this.lastDir = _V.sub(scene.mousePosVec, center);
+  }
+
+  handleMouseDrag(center) {
     if (!this.beingDragged) return;
-    // this.rotateEntity(dx, dy);
+    const currDir = _V.sub(scene.mousePosVec, center);
+    const da = currDir.angleBetween(this.lastDir);
+    this.lastDir = currDir;
+    this.rotateEntity(-da);
   }
 
   drawInterior(canvas) {
@@ -422,6 +434,7 @@ class PlaneMirror extends Mirror {
     this.normal = this.direction.copy().rotate(-HALF_PI);
     this.length = _V.dist(this.start, this.end);
     this.shadeDirection = this.direction.copy().rotate(3 * PI / 4);
+    this.center = _V.add(this.start, _V.mult(this.direction, this.length / 2));
     this.initBoundingBox();
   }
 
@@ -434,10 +447,6 @@ class PlaneMirror extends Mirror {
     this.boundingBox = [A, B, C, D];
   }
 
-  get buttonLocation() {
-    return this.boundingBox[0];
-  }
-
   isPointInside(x, y) {
     const p = createVector(x, y);
     const [A, B, C, D] = this.boundingBox;
@@ -445,10 +454,25 @@ class PlaneMirror extends Mirror {
       && isPointOnRight(D, C, p) && isPointOnRight(A, D, p);
   }
 
+  get buttonLocation() {
+    return this.boundingBox[0];
+  }
+
+  get centerLocation() {
+    return this.center;
+  }
+
   translate(dx, dy) {
     const step = createVector(dx, dy);
     this.start.add(step);
     this.end.add(step);
+    this.reset();
+  }
+
+  rotate(da) {
+    this.direction.rotate(da);
+    this.start = _V.add(this.center, _V.mult(this.direction, -this.length / 2));
+    this.end = _V.add(this.start, _V.mult(this.direction, this.length));
     this.reset();
   }
 
