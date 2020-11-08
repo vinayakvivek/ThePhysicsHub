@@ -751,6 +751,19 @@ class Ray extends SelectableEntity {
     this.reset();
   }
 
+  // update arrow position if end changes
+  updateArrowPos() {
+    const length = _V.sub(this.end, this.origin).mag();
+    const arrowDist = length > 200 ? 100 : length / 2;
+    this.arrowPos = _V.add(this.origin, _V.mult(this.direction, arrowDist));
+  }
+
+  reset() {
+    this.end = _V.mult(this.direction, MAX_LENGTH).add(this.origin);
+    this.updateArrowPos();
+    this.next = null;
+  }
+
   updateOrigin(o) {
     this.origin = o;
     this.reset();
@@ -764,22 +777,26 @@ class Ray extends SelectableEntity {
     this.reset();
   }
 
+  get buttonLocation() {
+    return this.origin;
+  }
+
+  get centerLocation() {
+    return this.origin;
+  }
+
   translate(dx, dy) {
     this.origin.add(createVector(dx, dy));
     this.reset();
   }
 
-  reset() {
-    this.end = _V.mult(this.direction, MAX_LENGTH).add(this.origin);
-    this.updateArrowPos();
-    this.next = null;
+  rotate(da) {
+    this.direction.rotate(da);
+    this.reset();
   }
 
-  // update arrow position if end changes
-  updateArrowPos() {
-    const length = _V.sub(this.end, this.origin).mag();
-    const arrowDist = length > 200 ? 100 : length / 2;
-    this.arrowPos = _V.add(this.origin, _V.mult(this.direction, arrowDist));
+  isPointInside(x, y) {
+    return createVector(x, y).sub(this.origin).mag() < this.boundsOffset;
   }
 
   pointAt(t) {
@@ -815,14 +832,6 @@ class Ray extends SelectableEntity {
       this.next = new Ray(nextName, this.end, r, this.level + 1, this.sourceName);
       this.next.cast(mirrors);
     }
-  }
-
-  get buttonLocation() {
-    return this.origin;
-  }
-
-  isPointInside(x, y) {
-    return createVector(x, y).sub(this.origin).mag() < this.boundsOffset;
   }
 
   drawBounds(canvas) {
