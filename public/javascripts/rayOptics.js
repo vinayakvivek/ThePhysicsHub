@@ -182,11 +182,12 @@ class Scene {
 class ButtonGroup {
 
   constructor() {
-    this.width = 50;
+    this.width = 100;
     this.height = 40;
     this.setEntity(null);
     this.isActive = false;
     this.translateButton = new TranslateButton(this.translateEntity);
+    this.rotateButton = new RotateButton(this.rotateEntity);
   }
 
   setEntity(entity) {
@@ -195,6 +196,11 @@ class ButtonGroup {
 
   translateEntity = (dx, dy) => {
     this.entity.translate(dx, dy);
+    scene.update();
+  }
+
+  rotateEntity = (da) => {
+    // this.entity.rotate(da);
     scene.update();
   }
 
@@ -208,14 +214,17 @@ class ButtonGroup {
 
   handleMousePress() {
     this.translateButton.handleMousePress();
+    this.rotateButton.handleMousePress();
   }
 
   handleMouseDrag() {
     this.translateButton.handleMouseDrag();
+    this.rotateButton.handleMouseDrag();
   }
 
   handleMouseRelease() {
     this.translateButton.handleMouseRelease();
+    this.rotateButton.handleMouseRelease();
   }
 
   draw(canvas) {
@@ -233,6 +242,8 @@ class ButtonGroup {
 
     canvas.translate(this.height / 2, this.height / 2);
     this.translateButton.draw(canvas);
+    canvas.translate(this.height, 0);
+    this.rotateButton.draw(canvas);
     canvas.pop();
   }
 }
@@ -260,11 +271,30 @@ class Button {
     }
   }
 
+  handleMousePress() {
+    if (!this.mouseIsOver) return;
+    this.lastPos = scene.mousePos;
+    this.beingDragged = true;
+  }
+
+  handleMouseRelease() {
+    this.beingDragged = false;
+  }
+
   drawBackground(canvas) {
     canvas.push();
     canvas.fill(this.fill);
     canvas.noStroke();
     canvas.circle(0, 0, this.r2 * 2);
+    canvas.pop();
+  }
+
+  drawArrow(canvas, length, size) {
+    canvas.push();
+    canvas.line(0, 0, length, 0);
+    canvas.translate(length, 0);
+    canvas.line(-size, -size, 0, 0);
+    canvas.line(-size, size, 0, 0);
     canvas.pop();
   }
 
@@ -290,31 +320,12 @@ class TranslateButton extends Button {
     this.color = 'white';
   }
 
-  handleMousePress() {
-    if (!this.mouseIsOver) return;
-    this.lastPos = scene.mousePos;
-    this.beingDragged = true;
-  }
-
   handleMouseDrag() {
     if (!this.beingDragged) return;
     const currPos = scene.mousePos;
     const [dx, dy] = [currPos[0] - this.lastPos[0], currPos[1] - this.lastPos[1]];
     this.lastPos = currPos;
     this.translateEntity(dx, dy);
-  }
-
-  handleMouseRelease() {
-    this.beingDragged = false;
-  }
-
-  drawArrow(canvas, length, size) {
-    canvas.push();
-    canvas.line(0, 0, length, 0);
-    canvas.translate(length, 0);
-    canvas.line(-size, -size, 0, 0);
-    canvas.line(-size, size, 0, 0);
-    canvas.pop();
   }
 
   drawInterior(canvas) {
@@ -325,6 +336,39 @@ class TranslateButton extends Button {
       this.drawArrow(canvas, this.r1, 2);
       canvas.rotate(PI / 2);
     }
+    canvas.pop();
+  }
+}
+
+class RotateButton extends Button {
+
+  constructor(rotateEntity) {
+    super();
+    this.lineWidth = 2.5;
+    this.r1 = 8;
+    this.rotateEntity = rotateEntity;
+    this.color = 'white';
+    this.highlightFill = 'olive';
+    this.normalFill = 'green';
+    this.activeFill = 'darkgreen';
+  }
+
+  handleMouseDrag() {
+    if (!this.beingDragged) return;
+    // this.rotateEntity(dx, dy);
+  }
+
+  drawInterior(canvas) {
+    canvas.push();
+    canvas.strokeWeight(this.lineWidth);
+    canvas.stroke(this.color);
+    const d = this.r1 * 2;
+    const a = PI * 1.5;
+    canvas.arc(0, 0, d, d, 0, a);
+    canvas.rotate(a);
+    canvas.translate(this.r1, 0);
+    canvas.rotate(PI * 0.4);
+    this.drawArrow(canvas, 0, 2);
     canvas.pop();
   }
 }
