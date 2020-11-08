@@ -183,7 +183,7 @@ class ButtonGroup {
 
   constructor() {
     this.width = 50;
-    this.height = 30;
+    this.height = 40;
     this.setEntity(null);
     this.isActive = false;
     this.translateButton = new TranslateButton(this.translateEntity);
@@ -222,14 +222,16 @@ class ButtonGroup {
     this.isActive = false;
     if (!this.entity) return;
     canvas.push();
-    canvas.fill(255, 255, 0);
+    canvas.noFill();
+    canvas.strokeWeight(1);
+    canvas.stroke(255);
     const location = this.entity.buttonLocation;
     canvas.translate(location.x, location.y);
     canvas.rect(0, 0, this.width, this.height);
 
     this.isActive = this.isMouseOver();
 
-    canvas.translate(15, 15);
+    canvas.translate(this.height / 2, this.height / 2);
     this.translateButton.draw(canvas);
     canvas.pop();
   }
@@ -238,9 +240,9 @@ class ButtonGroup {
 class Button {
 
   constructor() {
-    this.r1 = 9;
-    this.r2 = 10;
-    this.lineWidth = 1.3;
+    this.r1 = 10;
+    this.r2 = 15;
+    this.lineWidth = 2;
     this.edgeWidth = 0.8;
     this.fill = 'white';
   }
@@ -261,6 +263,7 @@ class Button {
   drawBackground(canvas) {
     canvas.push();
     canvas.fill(this.fill);
+    canvas.noStroke();
     canvas.circle(0, 0, this.r2 * 2);
     canvas.pop();
   }
@@ -270,6 +273,7 @@ class Button {
     this.mouseIsOver = this.isMouseOver(canvas);
     this.updateColor();
     this.drawBackground(canvas);
+    this.drawInterior(canvas);
     canvas.pop();
   }
 }
@@ -283,10 +287,10 @@ class TranslateButton extends Button {
     this.highlightFill = 'cornflowerblue';
     this.normalFill = 'deepskyblue';
     this.activeFill = 'darkblue';
+    this.color = 'white';
   }
 
   handleMousePress() {
-    console.log('YO');
     if (!this.mouseIsOver) return;
     this.lastPos = scene.mousePos;
     this.beingDragged = true;
@@ -302,6 +306,26 @@ class TranslateButton extends Button {
 
   handleMouseRelease() {
     this.beingDragged = false;
+  }
+
+  drawArrow(canvas, length, size) {
+    canvas.push();
+    canvas.line(0, 0, length, 0);
+    canvas.translate(length, 0);
+    canvas.line(-size, -size, 0, 0);
+    canvas.line(-size, size, 0, 0);
+    canvas.pop();
+  }
+
+  drawInterior(canvas) {
+    canvas.push();
+    canvas.strokeWeight(this.lineWidth);
+    canvas.stroke(this.color);
+    for (let i = 0; i < 4; ++i) {
+      this.drawArrow(canvas, this.r1, 2);
+      canvas.rotate(PI / 2);
+    }
+    canvas.pop();
   }
 }
 
@@ -695,7 +719,7 @@ class Ray extends SelectableEntity {
     this.updateArrowPos();
     if (this.level >= MAX_RAY_LEVEL) {
       // check if ray level limit is reached
-      print(`Ray level limit reached: ${MAX_RAY_LEVEL}`);
+      // print(`Ray level limit reached: ${MAX_RAY_LEVEL}`);
       return;
     }
     if (canReflect) {
