@@ -28,29 +28,27 @@ function setup() {
   plotCanvas.noFill()
   plotCanvas.rect(0, 0, Wplot, Hplot)
 
-  const m1Concave = new SphericalMirror(
-    'concave1',
-    createVector(350, 200),
-    createVector(550, 250),
-    createVector(350, 300),
-    false, // is convex
-  )
-  const m2Convex = new SphericalMirror(
-    'convex1',
-    createVector(100, 120),
-    createVector(150, 250),
-    createVector(100, 330),
-    true, // is convex
-  )
   scene = new Scene(
     [
-      // new Ray(createVector(300, 300), createVector(-13, 50)),
+      new Ray('ray0', createVector(300, 300), createVector(-13, 50)),
       new Ray('ray1', createVector(450, 270), createVector(-100, -20)),
       new Beam('beam1', createVector(250, 450), createVector(-1, -2), 10, 40),
     ],
     [
-      m1Concave,
-      m2Convex,
+      new SphericalMirror(
+        'concave1',
+        createVector(350, 200),
+        createVector(550, 250),
+        createVector(350, 300),
+        false, // is convex
+      ),
+      new SphericalMirror(
+        'convex1',
+        createVector(100, 120),
+        createVector(150, 250),
+        createVector(100, 330),
+        true, // is convex
+      ),
       new PlaneMirror('pm1', createVector(50, 500), createVector(550, 500)),
       new PlaneMirror('pm2', createVector(550, 100), createVector(50, 100)),
     ]
@@ -66,10 +64,7 @@ function draw() {
 
   simCanvas.clear()
   scene.draw(simCanvas);
-  // scene.updateSampleRayDirection(0, mouseX, mouseY);
-  // scene.translateSampleRay(0, random(-5, 5),  random(-5, 5));
   image(simCanvas, CANVAS_OFFSET, CANVAS_OFFSET);
-  // mouseClicked();
 }
 
 // Mouse interactions ------------
