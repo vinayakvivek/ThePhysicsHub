@@ -569,6 +569,7 @@ class SphericalMirror extends Mirror {
   // p1, p2, p3 are position vectors of points on the circumference
   constructor(name, p1, p2, p3, isConvex = true) {
     super(name);
+    this.boundOffset = 10;
     this.reset(p1, p2, p3, isConvex);
   }
 
@@ -590,8 +591,10 @@ class SphericalMirror extends Mirror {
       this.r = radius;
       this.isValid = true;
     }
+    this.resetArcAngles();
+  }
 
-    // arc angles
+  resetArcAngles() {
     const v1 = _V.sub(this.p1, this.c);
     const v3 = _V.sub(this.p3, this.c);
     this.arcStart = v1.heading();
@@ -599,8 +602,16 @@ class SphericalMirror extends Mirror {
 
     const a = v1.angleBetween(v3);
     this.arcAngle = a < 0 ? a + 2 * PI : a;
+  }
 
-    this.boundOffset = 10;
+  get buttonLocation() {
+    return this.p3;
+    // use location below, to keep buttonGroup at bottom
+    // return _V.add(this.c, createVector(0, this.r));
+  }
+
+  get centerLocation() {
+    return this.c;
   }
 
   translate(dx, dy) {
@@ -612,20 +623,16 @@ class SphericalMirror extends Mirror {
     this.c.add(step);
   }
 
-  drawBounds(canvas) {
-    const offset = this.boundOffset * 2;
-    const d = this.r * 2;
-    const d1 = max(d - offset, 1);
-    const d2 = d + offset;
-    canvas.push();
-    canvas.strokeWeight(1);
-    canvas.arc(0, 0, d1, d1, this.arcStart, this.arcEnd);
-    canvas.arc(0, 0, d2, d2, this.arcStart, this.arcEnd);
-    canvas.pop();
+  rotatePointByCenter(p, angle) {
+    p.sub(this.c).rotate(angle).add(this.c);
   }
 
-  get buttonLocation() {
-    return this.p3;
+  rotate(da) {
+    if (!this.isValid) return;
+    this.rotatePointByCenter(this.p1, da);
+    this.rotatePointByCenter(this.p2, da);
+    this.rotatePointByCenter(this.p3, da);
+    this.resetArcAngles();
   }
 
   isPointInside(x, y) {
@@ -679,6 +686,18 @@ class SphericalMirror extends Mirror {
     }
     const n = _V.sub(p, this.c).normalize().mult(this.isConvex ? 1 : -1);
     return { t, n };
+  }
+
+  drawBounds(canvas) {
+    const offset = this.boundOffset * 2;
+    const d = this.r * 2;
+    const d1 = max(d - offset, 1);
+    const d2 = d + offset;
+    canvas.push();
+    canvas.strokeWeight(1);
+    canvas.arc(0, 0, d1, d1, this.arcStart, this.arcEnd);
+    canvas.arc(0, 0, d2, d2, this.arcStart, this.arcEnd);
+    canvas.pop();
   }
 
   draw(canvas) {
