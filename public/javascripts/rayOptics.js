@@ -289,11 +289,11 @@ class TranslateButton extends Button {
     console.log('YO');
     if (!this.mouseIsOver) return;
     this.lastPos = scene.mousePos;
-    this.active = true;
+    this.beingDragged = true;
   }
 
   handleMouseDrag() {
-    if (!this.active) return;
+    if (!this.beingDragged) return;
     const currPos = scene.mousePos;
     const [dx, dy] = [currPos[0] - this.lastPos[0], currPos[1] - this.lastPos[1]];
     this.lastPos = currPos;
@@ -301,7 +301,7 @@ class TranslateButton extends Button {
   }
 
   handleMouseRelease() {
-    this.active = false;
+    this.beingDragged = false;
   }
 }
 
@@ -346,9 +346,13 @@ class PlaneMirror extends Mirror {
     super(name);
     this.start = start.copy();
     this.end = end.copy();
-    this.direction = _V.sub(end, start).normalize(); // direction parallel to mirror;
+    this.reset();
+  }
+
+  reset() {
+    this.direction = _V.sub(this.end, this.start).normalize(); // direction parallel to mirror;
     this.normal = this.direction.copy().rotate(-HALF_PI);
-    this.length = _V.dist(start, end);
+    this.length = _V.dist(this.start, this.end);
     this.shadeDirection = this.direction.copy().rotate(3 * PI / 4);
     this.initBoundingBox();
   }
@@ -371,6 +375,13 @@ class PlaneMirror extends Mirror {
     const [A, B, C, D] = this.boundingBox;
     return isPointOnRight(B, A, p) && isPointOnRight(C, B, p)
       && isPointOnRight(D, C, p) && isPointOnRight(A, D, p);
+  }
+
+  translate(dx, dy) {
+    const step = createVector(dx, dy);
+    this.start.add(step);
+    this.end.add(step);
+    this.reset();
   }
 
   intersectRay(ray) {
@@ -498,6 +509,15 @@ class SphericalMirror extends Mirror {
     this.arcAngle = a < 0 ? a + 2 * PI : a;
 
     this.boundOffset = 10;
+  }
+
+  translate(dx, dy) {
+    if (!this.isValid) return;
+    const step = createVector(dx, dy);
+    this.p1.add(step);
+    this.p2.add(step);
+    this.p3.add(step);
+    this.c.add(step);
   }
 
   drawBounds(canvas) {
